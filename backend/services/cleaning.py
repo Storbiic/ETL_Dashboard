@@ -137,31 +137,57 @@ def create_dim_dates(date_columns: List[pd.Series],
 def standardize_text(series: pd.Series) -> pd.Series:
     """
     Standardize text values by stripping whitespace and converting to title case.
-    
+
     Args:
         series: Pandas series with text values
-        
+
     Returns:
         Cleaned series
     """
-    def clean_text(val):
-        if pd.isna(val) or val is None:
-            return val
-        
-        # Convert to string and strip
-        text = str(val).strip()
-        
-        # Unescape newlines and normalize whitespace
-        text = re.sub(r'\\n', '\n', text)
-        text = re.sub(r'\s+', ' ', text)
-        
-        # Convert to title case for names
-        if len(text) > 0:
-            text = text.title()
-        
-        return text
-    
-    return series.apply(clean_text)
+    try:
+        # Ensure we're working with a proper Series
+        if not isinstance(series, pd.Series):
+            series = pd.Series(series)
+
+        # Create a copy to avoid modifying the original
+        result_series = series.copy()
+
+        # Process each value individually to avoid Series ambiguity
+        for idx in result_series.index:
+            try:
+                val = result_series.iloc[idx]
+
+                # Handle null/None values
+                if pd.isna(val) or val is None:
+                    continue
+
+                # Convert to string and strip
+                text = str(val).strip()
+
+                # Skip empty strings
+                if not text:
+                    continue
+
+                # Unescape newlines and normalize whitespace
+                text = re.sub(r'\\n', '\n', text)
+                text = re.sub(r'\s+', ' ', text)
+
+                # Convert to title case for names
+                if len(text) > 0:
+                    text = text.title()
+
+                result_series.iloc[idx] = text
+
+            except Exception as e:
+                # If there's an error processing this specific value, leave it as-is
+                continue
+
+        return result_series
+
+    except Exception as e:
+        # If there's a fundamental error, return the original series
+        print(f"Error in standardize_text: {e}")
+        return series
 
 
 def create_row_hash(df: pd.DataFrame, columns: Optional[List[str]] = None) -> pd.Series:

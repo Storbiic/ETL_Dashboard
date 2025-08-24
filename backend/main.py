@@ -105,6 +105,161 @@ app.include_router(
 )
 
 
+@app.get("/api/logs/recent")
+async def get_recent_logs():
+    """Get recent log entries for monitoring."""
+    import os
+    import json
+    from datetime import datetime
+
+    try:
+        logs = []
+        log_file = os.path.join(os.path.dirname(__file__), '..', 'logs', 'etl.log')
+
+        if os.path.exists(log_file):
+            with open(log_file, 'r') as f:
+                lines = f.readlines()
+                # Get last 50 lines
+                recent_lines = lines[-50:] if len(lines) > 50 else lines
+
+                for line in recent_lines:
+                    if line.strip():
+                        try:
+                            # Try to parse as JSON log
+                            log_data = json.loads(line.strip())
+                            logs.append(log_data)
+                        except json.JSONDecodeError:
+                            # Plain text log
+                            logs.append({
+                                'message': line.strip(),
+                                'timestamp': datetime.now().isoformat(),
+                                'level': 'info'
+                            })
+
+        return {"logs": logs, "count": len(logs)}
+
+    except Exception as e:
+        return {"error": f"Failed to read logs: {str(e)}", "logs": [], "count": 0}
+
+
+@app.get("/api/progress/status")
+async def get_progress_status():
+    """Get current ETL progress status."""
+    import os
+    import json
+    from datetime import datetime, timedelta
+
+    try:
+        # Read recent logs to determine current status
+        log_file = os.path.join(os.path.dirname(__file__), '..', 'logs', 'etl.log')
+
+        if not os.path.exists(log_file):
+            return {
+                "progress": 0,
+                "status": "idle",
+                "operation": "System Ready",
+                "description": "Waiting for ETL operations...",
+                "last_activity": None
+            }
+
+        # Get recent logs (last 5 minutes)
+        recent_logs = []
+        cutoff_time = datetime.now() - timedelta(minutes=5)
+
+        with open(log_file, 'r') as f:
+            lines = f.readlines()
+            recent_lines = lines[-20:] if len(lines) > 20 else lines
+
+            for line in recent_lines:
+                if line.strip():
+                    try:
+                        log_data = json.loads(line.strip())
+                        log_time = datetime.fromisoformat(log_data.get('timestamp', '').replace('Z', '+00:00'))
+                        if log_time > cutoff_time:
+                            recent_logs.append(log_data)
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+
+        # Analyze logs to determine current status
+        progress = 0
+        status = "idle"
+        operation = "System Ready"
+        description = "Waiting for ETL operations..."
+        last_activity = None
+
+        if recent_logs:
+            latest_log = recent_logs[-1]
+            last_activity = latest_log.get('timestamp')
+
+            # Check for errors
+            has_error = any((log.get('level') or log.get('severity') or '').upper() == 'ERROR' for log in recent_logs)
+
+            if has_error:
+                status = "error"
+                operation = "Error Occurred"
+                description = "An error occurred during processing. Check logs for details."
+                progress = 0
+            else:
+                # Determine progress based on recent log messages
+                for log in reversed(recent_logs):
+                    message = (log.get('message') or log.get('event') or '').lower()
+
+                    if 'file uploaded' in message:
+                        progress = 10
+                        status = "upload"
+                        operation = "File Upload"
+                        description = "Excel file uploaded successfully"
+                        break
+                    elif 'reading excel' in message or ('found' in message and 'sheets' in message):
+                        progress = 20
+                        status = "reading"
+                        operation = "Reading Sheets"
+                        description = "Loading Excel sheets..."
+                        break
+                    elif 'masterbom processing' in message or 'processing masterbom' in message:
+                        progress = 40
+                        status = "masterbom_processing"
+                        operation = "Processing MasterBOM"
+                        description = "Cleaning and transforming master data..."
+                        break
+                    elif 'status sheet processing' in message or 'processing status' in message:
+                        progress = 70
+                        status = "status_processing"
+                        operation = "Processing Status"
+                        description = "Processing status sheet data..."
+                        break
+                    elif 'etl transformation' in message:
+                        progress = 85
+                        status = "transformation"
+                        operation = "ETL Transformation"
+                        description = "Applying business rules and transformations..."
+                        break
+                    elif 'complete' in message and ('processing' in message or 'transformation' in message):
+                        progress = 100
+                        status = "complete"
+                        operation = "Complete"
+                        description = "ETL process completed successfully!"
+                        break
+
+        return {
+            "progress": progress,
+            "status": status,
+            "operation": operation,
+            "description": description,
+            "last_activity": last_activity,
+            "recent_logs_count": len(recent_logs)
+        }
+
+    except Exception as e:
+        return {
+            "progress": 0,
+            "status": "error",
+            "operation": "System Error",
+            "description": f"Failed to get progress status: {str(e)}",
+            "last_activity": None
+        }
+
+
 @app.on_event("startup")
 async def startup_event():
     """Application startup event."""

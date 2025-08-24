@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     max_upload_size: str = Field(default="50MB", alias="MAX_UPLOAD_SIZE")
     upload_folder: str = Field(default="data/uploads", alias="UPLOAD_FOLDER")
     processed_folder: str = Field(default="data/processed", alias="PROCESSED_FOLDER")
+
+    # Pipeline Configuration
+    pipeline_output_folder: str = Field(default="data/pipeline_output", alias="PIPELINE_OUTPUT_FOLDER")
+    powerbi_templates_folder: str = Field(default="powerbi/templates", alias="POWERBI_TEMPLATES_FOLDER")
+    auto_copy_to_pipeline: bool = Field(default=True, alias="AUTO_COPY_TO_PIPELINE")
     
     # Database Configuration
     database_url: str = Field(default="sqlite:///data/processed/etl.sqlite", alias="DATABASE_URL")
@@ -52,6 +57,16 @@ class Settings(BaseSettings):
     def processed_folder_path(self) -> Path:
         """Get processed folder as Path object."""
         return Path(self.processed_folder)
+
+    @property
+    def pipeline_output_folder_path(self) -> Path:
+        """Get pipeline output folder as Path object."""
+        return Path(self.pipeline_output_folder)
+
+    @property
+    def powerbi_templates_folder_path(self) -> Path:
+        """Get PowerBI templates folder as Path object."""
+        return Path(self.powerbi_templates_folder)
     
     @property
     def max_upload_bytes(self) -> int:

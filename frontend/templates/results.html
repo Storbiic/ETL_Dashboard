@@ -48,7 +48,27 @@
             <i class="fas fa-download mr-2 text-blue-600"></i>
             Download Files
         </h2>
-        
+
+        <!-- Download Actions -->
+        <div class="mb-4 flex flex-wrap gap-3">
+            <button id="downloadAllBtn" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center">
+                <i class="fas fa-download mr-2"></i>
+                Download All (ZIP)
+            </button>
+            <button id="openPipelineFolderBtn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center">
+                <i class="fas fa-folder-open mr-2"></i>
+                Open Pipeline Folder
+            </button>
+            <button id="openProcessedFolderBtn" class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors flex items-center">
+                <i class="fas fa-folder mr-2"></i>
+                Open Processed Folder
+            </button>
+            <button id="refreshFilesBtn" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors flex items-center">
+                <i class="fas fa-sync mr-2"></i>
+                Refresh Files
+            </button>
+        </div>
+
         <div id="artifacts-section">
             <div class="flex items-center justify-center py-8">
                 <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -82,6 +102,49 @@
             Power BI Integration
         </h2>
         
+        <!-- PowerBI Dashboard Actions -->
+        <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="font-medium text-blue-900 mb-1">
+                        <i class="fas fa-rocket mr-2"></i>
+                        Quick Start Dashboard
+                    </h3>
+                    <p class="text-sm text-blue-700">Open your data directly in PowerBI Desktop with pre-configured templates</p>
+                </div>
+                <div class="flex space-x-3">
+                    <button id="openPowerBIBtn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-external-link-alt mr-2"></i>
+                        Open PowerBI
+                    </button>
+                    <button id="refreshPipelineBtn" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors">
+                        <i class="fas fa-sync mr-2"></i>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+            <div id="powerbiStatus" class="mt-3 text-sm">
+                <div class="flex items-center text-gray-600">
+                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                    Loading PowerBI integration status...
+                </div>
+            </div>
+        </div>
+
+        <!-- Pipeline Output Status -->
+        <div id="pipelineSection" class="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <h3 class="font-medium text-gray-900 mb-2">
+                <i class="fas fa-cogs mr-2"></i>
+                Automated Pipeline Status
+            </h3>
+            <div id="pipelineStatus">
+                <div class="flex items-center text-gray-600">
+                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                    Loading pipeline status...
+                </div>
+            </div>
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="p-4 border border-gray-200 rounded-lg">
                 <h3 class="font-medium text-gray-900 mb-2">
@@ -93,7 +156,7 @@
                     Download Connectors <i class="fas fa-external-link-alt ml-1"></i>
                 </a>
             </div>
-            
+
             <div class="p-4 border border-gray-200 rounded-lg">
                 <h3 class="font-medium text-gray-900 mb-2">
                     <i class="fas fa-calculator mr-2 text-purple-600"></i>
@@ -104,7 +167,7 @@
                     Download Measures <i class="fas fa-external-link-alt ml-1"></i>
                 </a>
             </div>
-            
+
             <div class="p-4 border border-gray-200 rounded-lg">
                 <h3 class="font-medium text-gray-900 mb-2">
                     <i class="fas fa-book mr-2 text-orange-600"></i>
@@ -127,6 +190,12 @@ const FASTAPI_URL = '{{ fastapi_url }}';
 let transformResult = null;
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize PowerBI integration
+    initializePowerBIIntegration();
+
+    // Initialize download functionality
+    initializeDownloadFunctionality();
+
     // Try to get result from sessionStorage first
     const storedResult = sessionStorage.getItem(`transform_result_${fileId}`);
     if (storedResult) {
@@ -136,6 +205,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // If no stored result, show message to run transform
         showNoResultsMessage();
     }
+
+    // Load available files
+    loadAvailableFiles();
 });
 
 function renderResults() {
@@ -295,6 +367,382 @@ function renderLog(messages) {
     }).join('');
     
     container.innerHTML = html;
+}
+
+// PowerBI Integration Functions
+function initializePowerBIIntegration() {
+    // Add event listeners for PowerBI buttons
+    const openPowerBIBtn = document.getElementById('openPowerBIBtn');
+    const refreshPipelineBtn = document.getElementById('refreshPipelineBtn');
+
+    if (openPowerBIBtn) {
+        openPowerBIBtn.addEventListener('click', openPowerBIDashboard);
+    }
+
+    if (refreshPipelineBtn) {
+        refreshPipelineBtn.addEventListener('click', refreshPipelineStatus);
+    }
+
+    // Load initial status
+    loadPowerBIStatus();
+    loadPipelineStatus();
+}
+
+async function openPowerBIDashboard() {
+    const button = document.getElementById('openPowerBIBtn');
+    const originalText = button.innerHTML;
+
+    try {
+        // Show loading state
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Opening...';
+        button.disabled = true;
+
+        const response = await fetch('/api/powerbi/open', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            updatePowerBIStatus('success', 'PowerBI Desktop opened successfully!');
+        } else {
+            updatePowerBIStatus('error', result.error || 'Failed to open PowerBI Desktop');
+        }
+
+    } catch (error) {
+        console.error('Error opening PowerBI:', error);
+        updatePowerBIStatus('error', 'Failed to open PowerBI Desktop: ' + error.message);
+    } finally {
+        // Restore button
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
+async function loadPowerBIStatus() {
+    try {
+        const response = await fetch('/api/powerbi/templates');
+        const data = await response.json();
+
+        if (data.templates && data.templates.length > 0) {
+            const latestTemplate = data.templates[0];
+            updatePowerBIStatus('ready', `Template ready: ${latestTemplate.name}`);
+        } else {
+            updatePowerBIStatus('warning', 'No PowerBI templates found');
+        }
+
+    } catch (error) {
+        console.error('Error loading PowerBI status:', error);
+        updatePowerBIStatus('error', 'Failed to load PowerBI status');
+    }
+}
+
+async function loadPipelineStatus() {
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const fileId = urlParams.get('file_id');
+
+        if (!fileId) {
+            updatePipelineStatus('warning', 'No file ID available');
+            return;
+        }
+
+        const response = await fetch(`/api/pipeline/${fileId}/status`);
+        const data = await response.json();
+
+        if (data.error) {
+            updatePipelineStatus('error', data.error);
+        } else {
+            const filesCount = data.pipeline_files ? data.pipeline_files.length : 0;
+            const templatesCount = data.template_files ? data.template_files.length : 0;
+
+            updatePipelineStatus('success',
+                `Pipeline ready: ${filesCount} files, ${templatesCount} templates`);
+        }
+
+    } catch (error) {
+        console.error('Error loading pipeline status:', error);
+        updatePipelineStatus('error', 'Failed to load pipeline status');
+    }
+}
+
+async function refreshPipelineStatus() {
+    const button = document.getElementById('refreshPipelineBtn');
+    const originalText = button.innerHTML;
+
+    try {
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Refreshing...';
+        button.disabled = true;
+
+        await Promise.all([loadPowerBIStatus(), loadPipelineStatus()]);
+
+    } finally {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
+function updatePowerBIStatus(type, message) {
+    const statusElement = document.getElementById('powerbiStatus');
+
+    const iconClass = {
+        'success': 'fas fa-check-circle text-green-600',
+        'error': 'fas fa-exclamation-circle text-red-600',
+        'warning': 'fas fa-exclamation-triangle text-yellow-600',
+        'ready': 'fas fa-chart-bar text-blue-600'
+    }[type] || 'fas fa-info-circle text-gray-600';
+
+    statusElement.innerHTML = `
+        <div class="flex items-center">
+            <i class="${iconClass} mr-2"></i>
+            <span class="text-sm">${message}</span>
+        </div>
+    `;
+}
+
+function updatePipelineStatus(type, message) {
+    const statusElement = document.getElementById('pipelineStatus');
+
+    const iconClass = {
+        'success': 'fas fa-check-circle text-green-600',
+        'error': 'fas fa-exclamation-circle text-red-600',
+        'warning': 'fas fa-exclamation-triangle text-yellow-600'
+    }[type] || 'fas fa-info-circle text-gray-600';
+
+    statusElement.innerHTML = `
+        <div class="flex items-center">
+            <i class="${iconClass} mr-2"></i>
+            <span class="text-sm">${message}</span>
+        </div>
+    `;
+}
+
+// Download Functionality
+function initializeDownloadFunctionality() {
+    // Add event listeners for download buttons
+    const downloadAllBtn = document.getElementById('downloadAllBtn');
+    const openPipelineFolderBtn = document.getElementById('openPipelineFolderBtn');
+    const openProcessedFolderBtn = document.getElementById('openProcessedFolderBtn');
+    const refreshFilesBtn = document.getElementById('refreshFilesBtn');
+
+    if (downloadAllBtn) {
+        downloadAllBtn.addEventListener('click', downloadAllFiles);
+    }
+
+    if (openPipelineFolderBtn) {
+        openPipelineFolderBtn.addEventListener('click', () => openLocalFolder('pipeline'));
+    }
+
+    if (openProcessedFolderBtn) {
+        openProcessedFolderBtn.addEventListener('click', () => openLocalFolder('processed'));
+    }
+
+    if (refreshFilesBtn) {
+        refreshFilesBtn.addEventListener('click', loadAvailableFiles);
+    }
+}
+
+async function downloadAllFiles() {
+    const button = document.getElementById('downloadAllBtn');
+    const originalText = button.innerHTML;
+
+    try {
+        // Show loading state
+        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Preparing Download...';
+        button.disabled = true;
+
+        // Create download link for bulk download
+        const downloadUrl = `/download/bulk/${fileId}`;
+
+        // Create temporary link and trigger download
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Show success message
+        showToast('Download started! Check your downloads folder.', 'success');
+
+    } catch (error) {
+        console.error('Error downloading files:', error);
+        showToast('Failed to download files: ' + error.message, 'error');
+    } finally {
+        // Restore button
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
+async function openLocalFolder(folderType) {
+    try {
+        const response = await fetch(`/open-folder/${folderType}`, {
+            method: 'GET'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showToast(`Opened ${folderType} folder: ${result.path}`, 'success');
+        } else {
+            showToast(`Failed to open folder: ${result.error}`, 'error');
+        }
+
+    } catch (error) {
+        console.error('Error opening folder:', error);
+        showToast('Failed to open folder: ' + error.message, 'error');
+    }
+}
+
+async function loadAvailableFiles() {
+    try {
+        const response = await fetch('/api/files/list');
+        const data = await response.json();
+
+        if (data.files && data.files.length > 0) {
+            renderAvailableFiles(data.files);
+        } else {
+            renderNoFiles();
+        }
+
+    } catch (error) {
+        console.error('Error loading files:', error);
+        renderNoFiles('Failed to load files: ' + error.message);
+    }
+}
+
+function renderAvailableFiles(files) {
+    const container = document.getElementById('artifacts-section');
+
+    // Group files by type
+    const pipelineFiles = files.filter(f => f.type === 'pipeline_output');
+    const processedFiles = files.filter(f => f.type === 'processed');
+
+    let html = '';
+
+    if (pipelineFiles.length > 0) {
+        html += `
+            <div class="mb-6">
+                <h4 class="font-medium text-gray-900 mb-3 flex items-center">
+                    <i class="fas fa-cogs mr-2 text-blue-600"></i>
+                    Pipeline Output Files (${pipelineFiles.length})
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    ${pipelineFiles.map(file => renderFileCard(file)).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    if (processedFiles.length > 0) {
+        html += `
+            <div class="mb-6">
+                <h4 class="font-medium text-gray-900 mb-3 flex items-center">
+                    <i class="fas fa-database mr-2 text-green-600"></i>
+                    Processed Files (${processedFiles.length})
+                </h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    ${processedFiles.map(file => renderFileCard(file)).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    if (html === '') {
+        renderNoFiles();
+    } else {
+        container.innerHTML = html;
+    }
+}
+
+function renderFileCard(file) {
+    const fileIcon = getFileIcon(file.name);
+    const fileType = file.name.split('.').pop().toUpperCase();
+
+    return `
+        <div class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+            <div class="flex items-start justify-between mb-2">
+                <div class="flex items-center">
+                    <i class="${fileIcon} mr-2 text-lg"></i>
+                    <div>
+                        <div class="font-medium text-sm text-gray-900 truncate" title="${file.name}">
+                            ${file.name}
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            ${fileType} • ${file.size_human}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex space-x-2">
+                <a href="${file.download_url}"
+                   class="flex-1 bg-blue-600 text-white text-xs px-3 py-2 rounded text-center hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-download mr-1"></i>
+                    Download
+                </a>
+            </div>
+        </div>
+    `;
+}
+
+function getFileIcon(filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    switch (ext) {
+        case 'csv': return 'fas fa-file-csv text-green-600';
+        case 'parquet': return 'fas fa-database text-purple-600';
+        case 'sqlite': return 'fas fa-database text-blue-600';
+        case 'json': return 'fas fa-file-code text-yellow-600';
+        case 'md': return 'fas fa-file-alt text-gray-600';
+        default: return 'fas fa-file text-gray-600';
+    }
+}
+
+function renderNoFiles(message = 'No files available for download') {
+    const container = document.getElementById('artifacts-section');
+    container.innerHTML = `
+        <div class="text-center py-8">
+            <i class="fas fa-folder-open text-gray-400 text-3xl mb-4"></i>
+            <p class="text-gray-500">${message}</p>
+            <button onclick="loadAvailableFiles()" class="mt-4 text-blue-600 hover:text-blue-800">
+                <i class="fas fa-sync mr-1"></i>
+                Refresh
+            </button>
+        </div>
+    `;
+}
+
+function showToast(message, type = 'info') {
+    // Create toast notification
+    const toast = document.createElement('div');
+    toast.className = `fixed top-4 right-4 z-50 p-4 rounded-md shadow-lg max-w-sm ${
+        type === 'success' ? 'bg-green-600 text-white' :
+        type === 'error' ? 'bg-red-600 text-white' :
+        'bg-blue-600 text-white'
+    }`;
+
+    toast.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas ${
+                type === 'success' ? 'fa-check-circle' :
+                type === 'error' ? 'fa-exclamation-circle' :
+                'fa-info-circle'
+            } mr-2"></i>
+            <span class="text-sm">${message}</span>
+        </div>
+    `;
+
+    document.body.appendChild(toast);
+
+    // Remove toast after 5 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 5000);
 }
 
 function showNoResultsMessage() {

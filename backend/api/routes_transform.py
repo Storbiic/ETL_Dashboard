@@ -3,7 +3,7 @@
 import time
 import uuid
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException
@@ -16,6 +16,7 @@ from backend.services.masterbom_rules import MasterBOMProcessor
 from backend.services.status_rules import StatusProcessor
 from backend.services.storage import DataStorage
 from backend.services.cleaning import create_dim_dates, detect_date_columns
+from backend.services.pipeline_service import PipelineService
 
 router = APIRouter()
 
@@ -153,17 +154,30 @@ async def transform_data(request: TransformRequest):
             
             # Calculate summary statistics
             summary = _calculate_summary(all_dataframes, date_column_names, start_time)
-            
+
+            # Execute post-ETL pipeline
+            pipeline_service = PipelineService(etl_logger)
+            pipeline_results = pipeline_service.execute_post_etl_pipeline(
+                artifacts, all_dataframes, request.file_id
+            )
+
             etl_logger.info("ETL transformation completed successfully",
                            processing_time=summary.processing_time_seconds,
-                           total_artifacts=len(artifacts))
-            
-            return TransformResponse(
+                           total_artifacts=len(artifacts),
+                           pipeline_executed=pipeline_results.get("pipeline_executed", False))
+
+            response = TransformResponse(
                 success=True,
                 artifacts=artifacts,
                 summary=summary,
                 messages=etl_logger.get_messages()
             )
+
+            # Add pipeline results to response
+            if hasattr(response, '__dict__'):
+                response.__dict__['pipeline_results'] = pipeline_results
+
+            return response
             
         finally:
             excel_reader.close()
@@ -241,10 +255,10 @@ def _calculate_summary(dataframes: Dict[str, pd.DataFrame],
 async def get_transform_status(file_id: str):
     """
     Get status of a transformation (for future async processing).
-    
+
     Args:
         file_id: ID of the file being processed
-        
+
     Returns:
         Status information
     """
@@ -256,10 +270,93 @@ async def get_transform_status(file_id: str):
             status_code=400,
             detail="Invalid file ID format"
         )
-    
+
     # For now, return a simple status
     return {
         "file_id": file_id,
         "status": "not_implemented",
         "message": "Async processing not yet implemented"
     }
+
+
+@router.get("/pipeline/{file_id}/status")
+async def get_pipeline_status(file_id: str):
+    """
+    Get pipeline status for a specific file.
+
+    Args:
+        file_id: ID of the processed file
+
+    Returns:
+        Pipeline status information
+    """
+    try:
+        uuid.UUID(file_id)
+    except ValueError:
+        return {
+            "file_id": file_id,
+            "error": "Invalid file ID format"
+        }
+
+    try:
+        pipeline_service = PipelineService()
+        status = pipeline_service.get_pipeline_status(file_id)
+        return status
+
+    except Exception as e:
+        logger.error(f"Error in pipeline status endpoint: {e}")
+        return {
+            "file_id": file_id,
+            "error": str(e)
+        }
+
+
+@router.post("/powerbi/open")
+async def open_powerbi_dashboard():
+    """
+    Open PowerBI dashboard/template.
+
+    Returns:
+        Operation result
+    """
+    try:
+        pipeline_service = PipelineService()
+        result = pipeline_service.open_powerbi_dashboard()
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Error in PowerBI open endpoint: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Failed to open PowerBI dashboard"
+        }
+
+
+@router.get("/powerbi/templates")
+async def get_powerbi_templates():
+    """
+    Get list of available PowerBI templates.
+
+    Returns:
+        List of available templates
+    """
+    try:
+        pipeline_service = PipelineService()
+        templates = pipeline_service.get_available_templates()
+
+        return {
+            "templates": templates,
+            "count": len(templates),
+            "templates_folder": str(settings.powerbi_templates_folder_path.absolute())
+        }
+
+    except Exception as e:
+        logger.error(f"Error in PowerBI templates endpoint: {e}")
+        return {
+            "templates": [],
+            "count": 0,
+            "error": str(e),
+            "templates_folder": str(settings.powerbi_templates_folder_path.absolute())
+        }

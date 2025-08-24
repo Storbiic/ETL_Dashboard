@@ -15,7 +15,11 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
 
 # Configuration
 FASTAPI_BASE_URL = f"http://{os.getenv('FASTAPI_HOST', '127.0.0.1')}:{os.getenv('FASTAPI_PORT', '8000')}"
-PROCESSED_FOLDER = Path(os.getenv('PROCESSED_FOLDER', '../data/processed'))
+
+# Get the project root directory (parent of frontend directory)
+PROJECT_ROOT = Path(__file__).parent.parent
+PROCESSED_FOLDER = PROJECT_ROOT / os.getenv('PROCESSED_FOLDER', 'data/processed')
+PIPELINE_OUTPUT_FOLDER = PROJECT_ROOT / os.getenv('PIPELINE_OUTPUT_FOLDER', 'data/pipeline_output')
 
 
 @app.route('/')
@@ -66,34 +70,303 @@ def profile():
 def results():
     """Results page showing ETL outputs."""
     file_id = request.args.get('file_id')
-    
+
     if not file_id:
-        return render_template('index.html', 
+        return render_template('index.html',
                              error="Missing file_id parameter")
-    
+
     return render_template('results.html',
                          file_id=file_id,
                          fastapi_url=FASTAPI_BASE_URL,
                          page_title="ETL Results")
 
 
+@app.route('/logs')
+def logs():
+    """Logs page for monitoring system activity."""
+    return render_template('logs.html',
+                         fastapi_url=FASTAPI_BASE_URL,
+                         page_title="System Logs")
+
+
+@app.route('/api/logs/backend')
+def get_backend_logs():
+    """Get recent backend logs via API proxy."""
+    try:
+        response = requests.get(f"{FASTAPI_BASE_URL}/api/logs/recent", timeout=10)
+        return jsonify(response.json())
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": f"Failed to fetch backend logs: {str(e)}"}), 500
+
+
+@app.route('/api/progress/status')
+def get_progress_status():
+    """Get current ETL progress status via API proxy."""
+    try:
+        response = requests.get(f"{FASTAPI_BASE_URL}/api/progress/status", timeout=10)
+        return jsonify(response.json())
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": f"Failed to fetch progress status: {str(e)}"}), 500
+
+
+@app.route('/api/pipeline/<file_id>/status')
+def get_pipeline_status(file_id):
+    """Get pipeline status for a specific file via API proxy."""
+    try:
+        response = requests.get(f"{FASTAPI_BASE_URL}/api/pipeline/{file_id}/status", timeout=10)
+
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                "file_id": file_id,
+                "error": f"Backend returned status {response.status_code}",
+                "details": response.text
+            }), response.status_code
+
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            "file_id": file_id,
+            "error": f"Failed to fetch pipeline status: {str(e)}"
+        }), 500
+    except Exception as e:
+        return jsonify({
+            "file_id": file_id,
+            "error": f"Unexpected error: {str(e)}"
+        }), 500
+
+
+@app.route('/api/powerbi/open', methods=['POST'])
+def open_powerbi_dashboard():
+    """Open PowerBI dashboard via API proxy."""
+    try:
+        response = requests.post(
+            f"{FASTAPI_BASE_URL}/api/powerbi/open",
+            json={},
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                "success": False,
+                "error": f"Backend returned status {response.status_code}",
+                "details": response.text
+            }), response.status_code
+
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            "success": False,
+            "error": f"Failed to open PowerBI dashboard: {str(e)}"
+        }), 500
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": f"Unexpected error: {str(e)}"
+        }), 500
+
+
+@app.route('/api/powerbi/templates')
+def get_powerbi_templates():
+    """Get available PowerBI templates via API proxy."""
+    try:
+        response = requests.get(f"{FASTAPI_BASE_URL}/api/powerbi/templates", timeout=10)
+
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                "templates": [],
+                "count": 0,
+                "error": f"Backend returned status {response.status_code}",
+                "details": response.text
+            }), response.status_code
+
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            "templates": [],
+            "count": 0,
+            "error": f"Failed to fetch PowerBI templates: {str(e)}"
+        }), 500
+    except Exception as e:
+        return jsonify({
+            "templates": [],
+            "count": 0,
+            "error": f"Unexpected error: {str(e)}"
+        }), 500
+
+
 @app.route('/download/<filename>')
 def download_file(filename):
     """Download processed files."""
     try:
-        file_path = PROCESSED_FOLDER / filename
-        
+        # Try pipeline output folder first, then processed folder
+        file_path = PIPELINE_OUTPUT_FOLDER / filename
         if not file_path.exists():
-            return jsonify({"error": "File not found"}), 404
-        
+            file_path = PROCESSED_FOLDER / filename
+
+        if not file_path.exists():
+            return jsonify({"error": f"File not found: {filename}"}), 404
+
         return send_file(
             file_path,
             as_attachment=True,
             download_name=filename
         )
-        
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/download/bulk/<file_id>')
+def download_bulk_files(file_id):
+    """Download all files for a specific processing session as a ZIP."""
+    import zipfile
+    import tempfile
+    from datetime import datetime
+
+    try:
+        # Create a temporary ZIP file
+        temp_dir = tempfile.mkdtemp()
+        zip_filename = f"etl_results_{file_id[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        zip_path = Path(temp_dir) / zip_filename
+
+        # Find all files related to this processing session
+        files_to_zip = []
+
+        # Check pipeline output folder
+        if PIPELINE_OUTPUT_FOLDER.exists():
+            for file_path in PIPELINE_OUTPUT_FOLDER.iterdir():
+                if file_path.is_file():
+                    files_to_zip.append((file_path, f"pipeline_output/{file_path.name}"))
+
+        # Check processed folder
+        if PROCESSED_FOLDER.exists():
+            for file_path in PROCESSED_FOLDER.iterdir():
+                if file_path.is_file():
+                    files_to_zip.append((file_path, f"processed/{file_path.name}"))
+
+        if not files_to_zip:
+            return jsonify({"error": "No files found to download"}), 404
+
+        # Create ZIP file
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for file_path, archive_name in files_to_zip:
+                zipf.write(file_path, archive_name)
+
+        return send_file(
+            zip_path,
+            as_attachment=True,
+            download_name=zip_filename,
+            mimetype='application/zip'
+        )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/open-folder/<folder_type>')
+def open_local_folder(folder_type):
+    """Open local folder in file explorer."""
+    import subprocess
+    import platform
+
+    try:
+        if folder_type == 'pipeline':
+            folder_path = PIPELINE_OUTPUT_FOLDER
+        elif folder_type == 'processed':
+            folder_path = PROCESSED_FOLDER
+        else:
+            return jsonify({"error": "Invalid folder type"}), 400
+
+        if not folder_path.exists():
+            folder_path.mkdir(parents=True, exist_ok=True)
+
+        # Open folder based on operating system
+        system = platform.system()
+        if system == "Windows":
+            subprocess.run(['explorer', str(folder_path.absolute())], check=True)
+        elif system == "Darwin":  # macOS
+            subprocess.run(['open', str(folder_path.absolute())], check=True)
+        elif system == "Linux":
+            subprocess.run(['xdg-open', str(folder_path.absolute())], check=True)
+        else:
+            return jsonify({"error": f"Unsupported operating system: {system}"}), 400
+
+        return jsonify({
+            "success": True,
+            "message": f"Opened {folder_type} folder",
+            "path": str(folder_path.absolute())
+        })
+
+    except subprocess.CalledProcessError as e:
+        return jsonify({"error": f"Failed to open folder: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/files/list')
+def list_available_files():
+    """List all available files for download."""
+    try:
+        files = []
+
+        # Check pipeline output folder
+        if PIPELINE_OUTPUT_FOLDER.exists():
+            for file_path in PIPELINE_OUTPUT_FOLDER.iterdir():
+                if file_path.is_file():
+                    stat = file_path.stat()
+                    files.append({
+                        "name": file_path.name,
+                        "path": f"pipeline_output/{file_path.name}",
+                        "size_bytes": stat.st_size,
+                        "size_human": format_file_size(stat.st_size),
+                        "modified": stat.st_mtime,
+                        "type": "pipeline_output",
+                        "download_url": f"/download/{file_path.name}"
+                    })
+
+        # Check processed folder
+        if PROCESSED_FOLDER.exists():
+            for file_path in PROCESSED_FOLDER.iterdir():
+                if file_path.is_file():
+                    stat = file_path.stat()
+                    files.append({
+                        "name": file_path.name,
+                        "path": f"processed/{file_path.name}",
+                        "size_bytes": stat.st_size,
+                        "size_human": format_file_size(stat.st_size),
+                        "modified": stat.st_mtime,
+                        "type": "processed",
+                        "download_url": f"/download/{file_path.name}"
+                    })
+
+        # Sort by modification time (newest first)
+        files.sort(key=lambda f: f["modified"], reverse=True)
+
+        return jsonify({
+            "files": files,
+            "count": len(files),
+            "pipeline_folder": str(PIPELINE_OUTPUT_FOLDER.absolute()),
+            "processed_folder": str(PROCESSED_FOLDER.absolute())
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+def format_file_size(size_bytes):
+    """Format file size in human readable format."""
+    if size_bytes == 0:
+        return "0 B"
+
+    size_names = ["B", "KB", "MB", "GB"]
+    import math
+    i = int(math.floor(math.log(size_bytes, 1024)))
+    p = math.pow(1024, i)
+    s = round(size_bytes / p, 2)
+    return f"{s} {size_names[i]}"
 
 
 @app.route('/health')
@@ -102,7 +375,9 @@ def health():
     return jsonify({
         "status": "healthy",
         "frontend": "Flask",
-        "fastapi_url": FASTAPI_BASE_URL
+        "fastapi_url": FASTAPI_BASE_URL,
+        "pipeline_folder": str(PIPELINE_OUTPUT_FOLDER.absolute()),
+        "processed_folder": str(PROCESSED_FOLDER.absolute())
     })
 
 
