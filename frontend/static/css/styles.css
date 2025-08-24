@@ -1,0 +1,303 @@
+/* Custom styles for ETL Dashboard */
+
+/* Loading animations */
+.loading-spinner {
+    @apply animate-spin rounded-full border-2 border-gray-300 border-t-blue-600;
+}
+
+/* File upload area */
+.upload-area {
+    transition: all 0.3s ease;
+}
+
+.upload-area:hover {
+    @apply border-blue-400 bg-blue-50;
+}
+
+.upload-area.dragover {
+    @apply border-blue-500 bg-blue-100;
+}
+
+/* Progress bars */
+.progress-bar {
+    transition: width 0.3s ease;
+}
+
+/* Step indicators */
+.step-indicator {
+    transition: all 0.3s ease;
+}
+
+.step-indicator.active {
+    @apply bg-blue-600 text-white;
+}
+
+.step-indicator.completed {
+    @apply bg-green-600 text-white;
+}
+
+.step-indicator.inactive {
+    @apply bg-gray-300 text-gray-600;
+}
+
+/* Data tables */
+.data-table {
+    @apply min-w-full divide-y divide-gray-200;
+}
+
+.data-table th {
+    @apply px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50;
+}
+
+.data-table td {
+    @apply px-3 py-2 text-sm text-gray-900 max-w-xs truncate;
+}
+
+.data-table tbody tr:nth-child(even) {
+    @apply bg-gray-50;
+}
+
+.data-table tbody tr:hover {
+    @apply bg-blue-50;
+}
+
+/* Toast notifications */
+.toast {
+    @apply fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 transform transition-all duration-300;
+}
+
+.toast.show {
+    @apply translate-x-0 opacity-100;
+}
+
+.toast.hide {
+    @apply translate-x-full opacity-0;
+}
+
+.toast.success {
+    @apply bg-green-500 text-white;
+}
+
+.toast.error {
+    @apply bg-red-500 text-white;
+}
+
+.toast.warning {
+    @apply bg-yellow-500 text-white;
+}
+
+.toast.info {
+    @apply bg-blue-500 text-white;
+}
+
+/* Cards and panels */
+.card {
+    @apply bg-white rounded-lg shadow;
+}
+
+.card-header {
+    @apply px-6 py-4 border-b border-gray-200;
+}
+
+.card-body {
+    @apply p-6;
+}
+
+/* Buttons */
+.btn {
+    @apply px-4 py-2 rounded-md font-medium transition-colors duration-200;
+}
+
+.btn-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-secondary {
+    @apply bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-success {
+    @apply bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-warning {
+    @apply bg-yellow-600 text-white hover:bg-yellow-700 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+/* Form elements */
+.form-input {
+    @apply w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+}
+
+.form-select {
+    @apply w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+}
+
+.form-label {
+    @apply block text-sm font-medium text-gray-700 mb-2;
+}
+
+/* Status badges */
+.badge {
+    @apply px-2 py-1 text-xs font-medium rounded-full;
+}
+
+.badge-success {
+    @apply bg-green-100 text-green-800;
+}
+
+.badge-warning {
+    @apply bg-yellow-100 text-yellow-800;
+}
+
+.badge-error {
+    @apply bg-red-100 text-red-800;
+}
+
+.badge-info {
+    @apply bg-blue-100 text-blue-800;
+}
+
+.badge-secondary {
+    @apply bg-gray-100 text-gray-800;
+}
+
+/* Statistics cards */
+.stat-card {
+    @apply text-center p-4 rounded-lg;
+}
+
+.stat-card-blue {
+    @apply bg-blue-50 text-blue-600;
+}
+
+.stat-card-green {
+    @apply bg-green-50 text-green-600;
+}
+
+.stat-card-yellow {
+    @apply bg-yellow-50 text-yellow-600;
+}
+
+.stat-card-red {
+    @apply bg-red-50 text-red-600;
+}
+
+.stat-card-purple {
+    @apply bg-purple-50 text-purple-600;
+}
+
+.stat-card-orange {
+    @apply bg-orange-50 text-orange-600;
+}
+
+/* Log entries */
+.log-entry {
+    @apply flex items-start p-3 rounded-lg mb-2;
+}
+
+.log-entry.info {
+    @apply bg-blue-50 text-blue-800;
+}
+
+.log-entry.warning {
+    @apply bg-yellow-50 text-yellow-800;
+}
+
+.log-entry.error {
+    @apply bg-red-50 text-red-800;
+}
+
+.log-entry.debug {
+    @apply bg-gray-50 text-gray-800;
+}
+
+/* Responsive utilities */
+@media (max-width: 640px) {
+    .mobile-stack {
+        @apply flex-col space-y-4;
+    }
+    
+    .mobile-full {
+        @apply w-full;
+    }
+    
+    .mobile-hide {
+        @apply hidden;
+    }
+}
+
+/* Custom scrollbar */
+.custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e0 #f7fafc;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-gray-100;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-gray-400 rounded-full;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-500;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(0); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-out;
+}
+
+.slide-in {
+    animation: slideIn 0.3s ease-out;
+}
+
+.pulse-animation {
+    animation: pulse 2s infinite;
+}
+
+/* Utility classes */
+.text-truncate {
+    @apply truncate;
+}
+
+.shadow-hover {
+    transition: box-shadow 0.3s ease;
+}
+
+.shadow-hover:hover {
+    @apply shadow-lg;
+}
+
+.border-hover {
+    transition: border-color 0.3s ease;
+}
+
+.border-hover:hover {
+    @apply border-blue-400;
+}

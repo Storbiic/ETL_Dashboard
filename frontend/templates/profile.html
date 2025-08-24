@@ -1,0 +1,386 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Data Profile</h1>
+            <p class="text-gray-600">Analyze data quality and statistics</p>
+        </div>
+        <a href="{{ url_for('index') }}" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
+            <i class="fas fa-arrow-left mr-2"></i>Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Profile Results -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Master Sheet Profile -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">{{ master_sheet }} Profile</h2>
+            </div>
+            <div class="p-6">
+                <div id="master-profile" class="space-y-4">
+                    <div class="flex items-center justify-center py-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <span class="ml-3 text-gray-600">Analyzing data...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Sheet Profile -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="px-6 py-4 border-b border-gray-200">
+                <h2 class="text-lg font-semibold text-gray-900">{{ status_sheet }} Profile</h2>
+            </div>
+            <div class="p-6">
+                <div id="status-profile" class="space-y-4">
+                    <div class="flex items-center justify-center py-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <span class="ml-3 text-gray-600">Analyzing data...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Comparison Summary -->
+    <div id="comparison-section" class="bg-white rounded-lg shadow p-6 hidden">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-balance-scale mr-2 text-blue-600"></i>
+            Sheet Comparison
+        </h2>
+        <div id="comparison-content">
+            <!-- Comparison content will be loaded here -->
+        </div>
+    </div>
+
+    <!-- ETL Configuration -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">
+            <i class="fas fa-cogs mr-2 text-blue-600"></i>
+            ETL Configuration
+        </h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">ID Column</label>
+                <input type="text" id="id-column" value="YAZAKI PN" 
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <p class="text-xs text-gray-500 mt-1">Column containing part identifiers</p>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Date Columns</label>
+                <input type="text" id="date-columns" placeholder="Approved Date, Promised Date" 
+                       class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <p class="text-xs text-gray-500 mt-1">Comma-separated list of date columns</p>
+            </div>
+        </div>
+        
+        <div class="mt-6">
+            <h3 class="text-md font-medium text-gray-900 mb-3">Auto-detected Date Columns</h3>
+            <div id="detected-dates" class="flex flex-wrap gap-2">
+                <!-- Auto-detected date columns will appear here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex justify-between">
+        <button id="back-btn" class="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700">
+            <i class="fas fa-arrow-left mr-2"></i>
+            Back to Preview
+        </button>
+        
+        <button id="transform-btn" class="bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700">
+            <i class="fas fa-play mr-2"></i>
+            Run ETL Transform
+        </button>
+    </div>
+</div>
+
+<script>
+const fileId = '{{ file_id }}';
+const masterSheet = '{{ master_sheet }}';
+const statusSheet = '{{ status_sheet }}';
+const FASTAPI_URL = '{{ fastapi_url }}';
+
+let masterProfile = null;
+let statusProfile = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadProfiles();
+    
+    document.getElementById('back-btn').addEventListener('click', function() {
+        window.history.back();
+    });
+    
+    document.getElementById('transform-btn').addEventListener('click', function() {
+        runTransform();
+    });
+});
+
+async function loadProfiles() {
+    try {
+        // Load both profiles in parallel
+        const [masterResponse, statusResponse] = await Promise.all([
+            fetch(`${FASTAPI_URL}/api/profile?file_id=${fileId}&sheet=${encodeURIComponent(masterSheet)}`),
+            fetch(`${FASTAPI_URL}/api/profile?file_id=${fileId}&sheet=${encodeURIComponent(statusSheet)}`)
+        ]);
+        
+        if (!masterResponse.ok || !statusResponse.ok) {
+            throw new Error('Failed to load profiles');
+        }
+        
+        masterProfile = await masterResponse.json();
+        statusProfile = await statusResponse.json();
+        
+        // Render profiles
+        renderProfile(masterProfile, 'master-profile');
+        renderProfile(statusProfile, 'status-profile');
+        
+        // Load comparison
+        loadComparison();
+        
+        // Auto-detect date columns
+        detectDateColumns();
+        
+    } catch (error) {
+        console.error('Error loading profiles:', error);
+        showToast(`Failed to load data profiles: ${error.message}`, 'error');
+    }
+}
+
+function renderProfile(profile, containerId) {
+    const container = document.getElementById(containerId);
+    
+    // Summary stats
+    let html = `
+        <div class="grid grid-cols-2 gap-4 mb-4">
+            <div class="text-center p-3 bg-blue-50 rounded-lg">
+                <div class="text-2xl font-bold text-blue-600">${profile.total_rows.toLocaleString()}</div>
+                <div class="text-sm text-gray-600">Rows</div>
+            </div>
+            <div class="text-center p-3 bg-green-50 rounded-lg">
+                <div class="text-2xl font-bold text-green-600">${profile.total_cols}</div>
+                <div class="text-sm text-gray-600">Columns</div>
+            </div>
+        </div>
+    `;
+    
+    if (profile.duplicate_rows > 0) {
+        html += `
+            <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-yellow-600 mr-2"></i>
+                    <span class="text-sm text-yellow-800">
+                        ${profile.duplicate_rows} duplicate rows found
+                    </span>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Column details
+    html += '<div class="space-y-2">';
+    html += '<h4 class="font-medium text-gray-900">Column Quality</h4>';
+    
+    profile.columns.forEach(col => {
+        const nullPercentage = col.null_percentage;
+        const qualityColor = nullPercentage < 10 ? 'green' : nullPercentage < 30 ? 'yellow' : 'red';
+        
+        html += `
+            <div class="flex items-center justify-between p-2 bg-gray-50 rounded">
+                <div class="flex-1">
+                    <div class="font-medium text-sm">${escapeHtml(col.name)}</div>
+                    <div class="text-xs text-gray-500">${col.dtype} • ${col.unique_count} unique</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm font-medium text-${qualityColor}-600">
+                        ${(100 - nullPercentage).toFixed(1)}% complete
+                    </div>
+                    <div class="text-xs text-gray-500">
+                        ${col.non_null_count.toLocaleString()} / ${(col.non_null_count + col.null_count).toLocaleString()}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    
+    container.innerHTML = html;
+}
+
+async function loadComparison() {
+    try {
+        const response = await fetch(`${FASTAPI_URL}/api/profile/${fileId}/compare?sheet1=${encodeURIComponent(masterSheet)}&sheet2=${encodeURIComponent(statusSheet)}`);
+        
+        if (!response.ok) {
+            throw new Error('Failed to load comparison');
+        }
+        
+        const comparison = await response.json();
+        renderComparison(comparison);
+        
+        document.getElementById('comparison-section').classList.remove('hidden');
+        
+    } catch (error) {
+        console.error('Error loading comparison:', error);
+    }
+}
+
+function renderComparison(comparison) {
+    const container = document.getElementById('comparison-content');
+    
+    let html = `
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div class="text-center p-3 bg-blue-50 rounded-lg">
+                <div class="text-lg font-bold text-blue-600">${comparison.compatibility.common_columns.length}</div>
+                <div class="text-sm text-gray-600">Common Columns</div>
+            </div>
+            <div class="text-center p-3 bg-orange-50 rounded-lg">
+                <div class="text-lg font-bold text-orange-600">${comparison.compatibility.size_difference.toLocaleString()}</div>
+                <div class="text-sm text-gray-600">Row Difference</div>
+            </div>
+            <div class="text-center p-3 bg-purple-50 rounded-lg">
+                <div class="text-lg font-bold text-purple-600">${comparison.compatibility.column_difference}</div>
+                <div class="text-sm text-gray-600">Column Difference</div>
+            </div>
+        </div>
+    `;
+    
+    if (comparison.recommendations && comparison.recommendations.length > 0) {
+        html += '<div class="space-y-2">';
+        html += '<h4 class="font-medium text-gray-900">Recommendations</h4>';
+        comparison.recommendations.forEach(rec => {
+            html += `
+                <div class="flex items-start p-2 bg-yellow-50 border border-yellow-200 rounded">
+                    <i class="fas fa-lightbulb text-yellow-600 mr-2 mt-0.5"></i>
+                    <span class="text-sm text-yellow-800">${escapeHtml(rec)}</span>
+                </div>
+            `;
+        });
+        html += '</div>';
+    }
+    
+    container.innerHTML = html;
+}
+
+function detectDateColumns() {
+    if (!masterProfile) return;
+    
+    const dateColumns = masterProfile.columns
+        .filter(col => col.dtype === 'date' || col.name.toLowerCase().includes('date'))
+        .map(col => col.name);
+    
+    const container = document.getElementById('detected-dates');
+    
+    if (dateColumns.length > 0) {
+        container.innerHTML = dateColumns.map(col => 
+            `<span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">${escapeHtml(col)}</span>`
+        ).join('');
+        
+        // Auto-populate date columns input
+        document.getElementById('date-columns').value = dateColumns.join(', ');
+    } else {
+        container.innerHTML = '<span class="text-sm text-gray-500">No date columns detected</span>';
+    }
+}
+
+async function runTransform() {
+    const transformBtn = document.getElementById('transform-btn');
+    const originalText = transformBtn.innerHTML;
+    
+    try {
+        // Disable button and show loading
+        transformBtn.disabled = true;
+        transformBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Running Transform...';
+        
+        // Prepare request
+        const dateColumns = document.getElementById('date-columns').value
+            .split(',')
+            .map(col => col.trim())
+            .filter(col => col.length > 0);
+        
+        const request = {
+            file_id: fileId,
+            master_sheet: masterSheet,
+            status_sheet: statusSheet,
+            options: {
+                id_col: document.getElementById('id-column').value || 'YAZAKI PN',
+                date_cols: dateColumns
+            }
+        };
+        
+        console.log('🔧 Sending transform request:', request);
+
+        const response = await fetch('/api/transform', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(request)
+        });
+
+        console.log('🔧 Transform response status:', response.status);
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Transform failed');
+        }
+        
+        const result = await response.json();
+        
+        console.log('🔧 Transform result:', result);
+
+        if (result.success) {
+            // Store result in sessionStorage for results page
+            sessionStorage.setItem(`transform_result_${fileId}`, JSON.stringify(result));
+
+            showToast('ETL transformation completed successfully!', 'success');
+
+            // Redirect to results page
+            setTimeout(() => {
+                window.location.href = `/results?file_id=${fileId}`;
+            }, 1500);
+        } else {
+            throw new Error(result.error || 'Transform failed');
+        }
+        
+    } catch (error) {
+        console.error('Transform error:', error);
+        showToast(`Transform failed: ${error.message}`, 'error');
+        
+        // Re-enable button
+        transformBtn.disabled = false;
+        transformBtn.innerHTML = originalText;
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `fixed top-4 right-4 p-4 rounded-md shadow-lg z-50 ${
+        type === 'error' ? 'bg-red-500 text-white' : 
+        type === 'success' ? 'bg-green-500 text-white' : 
+        'bg-blue-500 text-white'
+    }`;
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 5000);
+}
+</script>
+{% endblock %}
