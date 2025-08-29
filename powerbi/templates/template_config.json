@@ -52,7 +52,7 @@
   "metadata": {
     "created_by": "ETL Dashboard",
     "tables_count": 5,
-    "total_rows": 104234,
+    "total_rows": 96930,
     "data_source": "Parquet Files",
     "refresh_method": "Manual/Scheduled"
   }

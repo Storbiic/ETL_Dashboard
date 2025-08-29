@@ -125,7 +125,7 @@ Generated data dictionary for ETL processed tables.
 
 ## plant_item_status
 
-**Rows:** 94886
+**Rows:** 87582
 **Columns:** 13
 
 | Column | Type | Description |

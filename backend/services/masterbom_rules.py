@@ -174,85 +174,274 @@ class MasterBOMProcessor:
         self.logger.info("Standardized text columns", count=standardized)
     
     def _create_plant_item_status(self) -> pd.DataFrame:
-        """Create normalized plant-item-status long table."""
+        """
+        Create normalized plant-item-status long table with enhanced duplicate handling.
+
+        Implements:
+        - Proper status handling: 'X' (Active), 'D' (Discontinued), Blank/NULL (Not in Project)
+        - Morocco supplier prioritization for duplicates
+        - Enhanced duplicate resolution logic
+        """
         if not self.project_columns:
             self.logger.warning("No project columns found for normalization")
             return pd.DataFrame()
-        
-        # Prepare base data
+
+        self.logger.info("Starting enhanced plant-item-status processing",
+                        project_columns=len(self.project_columns),
+                        total_parts=len(self.df))
+
+        # Step 1: Handle duplicates in source data BEFORE melting
+        deduplicated_df = self._handle_source_duplicates()
+
+        # Step 2: Prepare base data with additional columns for duplicate resolution
         base_cols = ['part_id_std', 'part_id_raw']
         if self.id_column:
             base_cols.append(self.id_column)
-        
-        # Melt project columns into long format
-        id_vars = [col for col in base_cols if col in self.df.columns]
-        
+
+        # Add supplier and FAR status columns if available for duplicate resolution
+        additional_cols = []
+        if 'Supplier Name' in deduplicated_df.columns:
+            additional_cols.append('Supplier Name')
+        if 'FAR Status' in deduplicated_df.columns:
+            additional_cols.append('FAR Status')
+
+        # Step 3: Melt project columns into long format
+        id_vars = [col for col in base_cols + additional_cols if col in deduplicated_df.columns]
+
         melted = pd.melt(
-            self.df,
+            deduplicated_df,
             id_vars=id_vars,
             value_vars=self.project_columns,
             var_name='project_plant',
             value_name='raw_status'
         )
-        
-        # Apply status classification rules
-        melted['status_class'] = melted.apply(self._classify_status, axis=1)
-        melted['is_duplicate'] = melted.apply(self._check_duplicate, axis=1)
-        melted['is_new'] = melted['status_class'] == 'new'
+
+        # Step 4: Apply enhanced status classification rules
+        melted['status_class'] = melted.apply(self._classify_status_enhanced, axis=1)
+        melted['is_duplicate'] = False  # Will be updated in duplicate detection
+        melted['is_new'] = melted['status_class'] == 'not_in_project'
         melted['notes'] = None
-        
-        # Calculate plant counts per part
+
+        # Step 5: Detect and resolve remaining duplicates in melted data
+        melted = self._resolve_melted_duplicates(melted)
+
+        # Step 6: Calculate plant counts per part
         plant_counts = self._calculate_plant_counts(melted)
         melted = melted.merge(plant_counts, on='part_id_std', how='left')
-        
-        self.logger.info("Created plant-item-status table",
+
+        # Step 7: Clean up columns (remove helper columns if they exist)
+        final_columns = [
+            'part_id_std', 'part_id_raw', self.id_column, 'project_plant',
+            'raw_status', 'status_class', 'is_duplicate', 'is_new', 'notes',
+            'n_active', 'n_inactive', 'n_new', 'n_duplicate'
+        ]
+        final_columns = [col for col in final_columns if col in melted.columns and col is not None]
+        melted = melted[final_columns]
+
+        self.logger.info("Enhanced plant-item-status processing complete",
                         total_records=len(melted),
                         unique_parts=melted['part_id_std'].nunique(),
-                        unique_plants=melted['project_plant'].nunique())
-        
+                        unique_plants=melted['project_plant'].nunique(),
+                        active_records=len(melted[melted['status_class'] == 'active']),
+                        discontinued_records=len(melted[melted['status_class'] == 'discontinued']),
+                        not_in_project_records=len(melted[melted['status_class'] == 'not_in_project']))
+
         return melted
     
-    def _classify_status(self, row) -> str:
-        """Classify status based on raw_status value."""
+    def _classify_status_enhanced(self, row) -> str:
+        """
+        Enhanced status classification based on raw_status value.
+
+        Status Logic:
+        - 'X': Active - Part is currently active and still included in the project plant
+        - 'D': Discontinued - Part has been deleted/discontinued from the project plant
+        - Blank/NULL: Not in Project - Part is not present in the current project
+        """
         raw_status = str(row['raw_status']).strip().upper()
-        
+
         if raw_status == 'X':
             return 'active'
         elif raw_status == 'D':
-            return 'inactive'
+            return 'discontinued'
+        elif raw_status in ['', 'NAN', 'NONE', 'NULL']:
+            return 'not_in_project'
         elif raw_status == '0':
-            # Check for duplicates - simplified logic
-            return 'duplicate'  # Will be refined in _check_duplicate
-        elif raw_status in ['', 'NAN', 'NONE']:
-            return 'new'
+            # Legacy duplicate marker - treat as not in project for now
+            return 'not_in_project'
         else:
-            return 'new'  # Default for unknown values
+            # Any other value - treat as not in project
+            return 'not_in_project'
+
+    def _classify_status(self, row) -> str:
+        """Legacy status classification - kept for backward compatibility."""
+        return self._classify_status_enhanced(row)
     
+    def _handle_source_duplicates(self) -> pd.DataFrame:
+        """
+        Handle duplicates in source data with Morocco supplier prioritization.
+
+        Duplicate Handling Logic:
+        1. Identify duplicated Yazaki PNs with different FAR Status values
+        2. Check Supplier Name field for Morocco-related suppliers
+        3. Prioritize Morocco suppliers when duplicates exist
+        4. Keep only the Morocco supplier record when choosing between duplicates
+        """
+        df_work = self.df.copy()
+
+        if 'part_id_std' not in df_work.columns:
+            self.logger.warning("No part_id_std column found for duplicate handling")
+            return df_work
+
+        # Find duplicated part IDs
+        duplicated_parts = df_work[df_work.duplicated(subset=['part_id_std'], keep=False)]
+
+        if duplicated_parts.empty:
+            self.logger.info("No duplicates found in source data")
+            return df_work
+
+        self.logger.info("Processing duplicates in source data",
+                        total_duplicates=len(duplicated_parts),
+                        unique_duplicated_parts=duplicated_parts['part_id_std'].nunique())
+
+        # Process each duplicated part
+        resolved_records = []
+        non_duplicated = df_work[~df_work.duplicated(subset=['part_id_std'], keep=False)]
+
+        for part_id in duplicated_parts['part_id_std'].unique():
+            part_records = df_work[df_work['part_id_std'] == part_id].copy()
+
+            # Apply Morocco supplier prioritization
+            resolved_record = self._resolve_duplicate_with_morocco_priority(part_id, part_records)
+            resolved_records.append(resolved_record)
+
+        # Combine resolved records with non-duplicated records
+        if resolved_records:
+            resolved_df = pd.concat(resolved_records, ignore_index=True)
+            final_df = pd.concat([non_duplicated, resolved_df], ignore_index=True)
+        else:
+            final_df = non_duplicated
+
+        duplicates_removed = len(df_work) - len(final_df)
+        self.logger.info("Source duplicate resolution complete",
+                        original_records=len(df_work),
+                        final_records=len(final_df),
+                        duplicates_removed=duplicates_removed)
+
+        return final_df
+
+    def _resolve_duplicate_with_morocco_priority(self, part_id: str, part_records: pd.DataFrame) -> pd.DataFrame:
+        """
+        Resolve duplicates for a specific part ID using Morocco supplier priority.
+
+        Args:
+            part_id: The part ID being processed
+            part_records: All records for this part ID
+
+        Returns:
+            Single record (highest priority) for this part ID
+        """
+        if len(part_records) == 1:
+            return part_records
+
+        # Check if we have Supplier Name column
+        if 'Supplier Name' not in part_records.columns:
+            self.logger.warning(f"No Supplier Name column for duplicate resolution of {part_id}")
+            return part_records.iloc[[0]]  # Return first record
+
+        # Define Morocco supplier patterns (case-insensitive)
+        morocco_patterns = ['MA', 'MAROC', 'MOROCCO', 'MAROC']
+
+        # Find Morocco suppliers
+        morocco_records = pd.DataFrame()
+        for pattern in morocco_patterns:
+            mask = part_records['Supplier Name'].str.contains(pattern, case=False, na=False)
+            if mask.any():
+                morocco_records = pd.concat([morocco_records, part_records[mask]], ignore_index=True)
+
+        # Remove duplicates in morocco_records if any
+        if not morocco_records.empty:
+            morocco_records = morocco_records.drop_duplicates()
+
+        # Decision logic
+        if len(morocco_records) == 1:
+            # Single Morocco supplier found - use it
+            selected_record = morocco_records
+            self.logger.info(f"Morocco supplier prioritized for part {part_id}",
+                           supplier=morocco_records.iloc[0].get('Supplier Name', 'Unknown'),
+                           total_duplicates=len(part_records))
+        elif len(morocco_records) > 1:
+            # Multiple Morocco suppliers - use first one
+            selected_record = morocco_records.iloc[[0]]
+            self.logger.info(f"Multiple Morocco suppliers found for part {part_id}, using first",
+                           supplier=selected_record.iloc[0].get('Supplier Name', 'Unknown'),
+                           total_morocco_records=len(morocco_records))
+        else:
+            # No Morocco suppliers found - use first record
+            selected_record = part_records.iloc[[0]]
+            self.logger.info(f"No Morocco supplier found for part {part_id}, using first record",
+                           supplier=selected_record.iloc[0].get('Supplier Name', 'Unknown'),
+                           total_duplicates=len(part_records))
+
+        return selected_record
+
     def _check_duplicate(self, row) -> bool:
-        """Check if part is a duplicate."""
-        if row['status_class'] == 'duplicate':
-            # Count occurrences of this part_id_std in the original DataFrame
-            part_count = (self.df['part_id_std'] == row['part_id_std']).sum()
-            return part_count > 1
-        return False
+        """Legacy duplicate check - kept for backward compatibility."""
+        return False  # Duplicates are now handled in preprocessing
     
+    def _resolve_melted_duplicates(self, melted_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Resolve any remaining duplicates in the melted data.
+
+        This handles edge cases where duplicates might still exist after source processing.
+        """
+        # Check for duplicates in melted data (same part + same project_plant)
+        duplicate_mask = melted_df.duplicated(subset=['part_id_std', 'project_plant'], keep=False)
+
+        if not duplicate_mask.any():
+            self.logger.info("No duplicates found in melted data")
+            return melted_df
+
+        duplicated_melted = melted_df[duplicate_mask]
+        self.logger.info("Processing duplicates in melted data",
+                        duplicate_records=len(duplicated_melted))
+
+        # For melted duplicates, keep the first occurrence
+        # (since source duplicates should already be resolved)
+        cleaned_melted = melted_df.drop_duplicates(subset=['part_id_std', 'project_plant'], keep='first')
+
+        duplicates_removed = len(melted_df) - len(cleaned_melted)
+        if duplicates_removed > 0:
+            self.logger.info("Removed duplicates from melted data",
+                           duplicates_removed=duplicates_removed)
+
+        return cleaned_melted
+
     def _calculate_plant_counts(self, melted_df: pd.DataFrame) -> pd.DataFrame:
-        """Calculate counts by status for each part."""
+        """Calculate counts by status for each part with updated status names."""
         counts = melted_df.groupby('part_id_std')['status_class'].value_counts().unstack(fill_value=0)
-        
-        # Ensure all status columns exist
-        for status in ['active', 'inactive', 'new', 'duplicate']:
-            if status not in counts.columns:
-                counts[status] = 0
-        
-        # Rename columns
-        counts = counts.rename(columns={
+
+        # Ensure all status columns exist with new naming
+        status_mapping = {
             'active': 'n_active',
-            'inactive': 'n_inactive', 
-            'new': 'n_new',
+            'discontinued': 'n_inactive',  # Map discontinued to n_inactive for compatibility
+            'not_in_project': 'n_new',     # Map not_in_project to n_new for compatibility
             'duplicate': 'n_duplicate'
-        })
-        
+        }
+
+        # Create columns for all possible statuses
+        for old_status, new_col in status_mapping.items():
+            if old_status not in counts.columns:
+                counts[old_status] = 0
+
+        # Rename columns according to mapping
+        counts = counts.rename(columns=status_mapping)
+
+        # Ensure all expected columns exist
+        expected_cols = ['n_active', 'n_inactive', 'n_new', 'n_duplicate']
+        for col in expected_cols:
+            if col not in counts.columns:
+                counts[col] = 0
+
         return counts.reset_index()
     
     def _create_fact_parts(self) -> pd.DataFrame:
