@@ -5,7 +5,7 @@ Generated data dictionary for ETL processed tables.
 ## masterbom_clean
 
 **Rows:** 4313
-**Columns:** 111
+**Columns:** 99
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -80,18 +80,6 @@ Generated data dictionary for ETL processed tables.
 | Parts Under Deviation | object | Data column |
 | part_id_raw | object | Original part ID from source |
 | part_id_std | object | Standardized part ID (cleaned) |
-| Supplier PN_date | object | Data column |
-| Supplier PN_year | float64 | Data column |
-| Supplier PN_month | float64 | Data column |
-| Supplier PN_day | float64 | Data column |
-| Supplier PN_qtr | float64 | Data column |
-| Supplier PN_week | UInt32 | Data column |
-| Original Supplier PN_date | object | Data column |
-| Original Supplier PN_year | float64 | Data column |
-| Original Supplier PN_month | float64 | Data column |
-| Original Supplier PN_day | float64 | Data column |
-| Original Supplier PN_qtr | float64 | Data column |
-| Original Supplier PN_week | UInt32 | Data column |
 | Approved Date_date | object | Data column |
 | Approved Date_year | float64 | Data column |
 | Approved Date_month | float64 | Data column |

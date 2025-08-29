@@ -132,7 +132,7 @@ async function uploadFile(file) {
 
         // Enable next step
         enableStep(2);
-        populateSheetSelectors(result.sheet_names);
+        populateSheetSelectors(result.sheet_names, result.detected_sheets);
 
         showToast('File uploaded successfully!', 'success');
         
@@ -228,16 +228,16 @@ function initializeSheetSelection() {
     });
 }
 
-function populateSheetSelectors(sheetNames) {
+function populateSheetSelectors(sheetNames, detectedSheets = null) {
     const masterSelect = document.getElementById('master-sheet');
     const statusSelect = document.getElementById('status-sheet');
-    
+
     if (!masterSelect || !statusSelect) return;
-    
+
     // Clear existing options
     masterSelect.innerHTML = '<option value="">Select sheet...</option>';
     statusSelect.innerHTML = '<option value="">Select sheet...</option>';
-    
+
     // Add sheet options
     sheetNames.forEach(sheet => {
         const option1 = new Option(sheet, sheet);
@@ -245,9 +245,104 @@ function populateSheetSelectors(sheetNames) {
         masterSelect.add(option1);
         statusSelect.add(option2);
     });
-    
+
+    // Handle auto-detection
+    if (detectedSheets) {
+        showAutoDetectionResults(detectedSheets);
+
+        // Auto-select detected sheets if confidence is high
+        if (detectedSheets.masterbom && detectedSheets.confidence?.masterbom >= 0.7) {
+            masterSelect.value = detectedSheets.masterbom;
+        }
+        if (detectedSheets.status && detectedSheets.confidence?.status >= 0.7) {
+            statusSelect.value = detectedSheets.status;
+        }
+
+        // Check if both sheets are auto-selected
+        checkSheetSelection();
+    }
+
     // Show sheet selection section
     document.getElementById('sheet-selection').classList.remove('hidden');
+}
+
+function showAutoDetectionResults(detectedSheets) {
+    // Create or update auto-detection info panel
+    let infoPanel = document.getElementById('auto-detection-info');
+    if (!infoPanel) {
+        infoPanel = document.createElement('div');
+        infoPanel.id = 'auto-detection-info';
+        infoPanel.className = 'bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4';
+
+        const sheetSelection = document.getElementById('sheet-selection');
+        sheetSelection.insertBefore(infoPanel, sheetSelection.firstChild);
+    }
+
+    let html = `
+        <div class="flex items-start">
+            <div class="flex-shrink-0">
+                <i class="fas fa-magic text-blue-600 text-lg"></i>
+            </div>
+            <div class="ml-3 flex-1">
+                <h4 class="text-sm font-medium text-blue-900 mb-2">Auto-Detection Results</h4>
+                <div class="space-y-2">
+    `;
+
+    // Show MasterBOM detection
+    if (detectedSheets.masterbom) {
+        const confidence = Math.round((detectedSheets.confidence?.masterbom || 0) * 100);
+        const confidenceColor = confidence >= 70 ? 'text-green-600' : confidence >= 50 ? 'text-yellow-600' : 'text-red-600';
+        html += `
+            <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-700">
+                    <i class="fas fa-cogs mr-1"></i>
+                    MasterBOM Sheet: <strong>${detectedSheets.masterbom}</strong>
+                </span>
+                <span class="${confidenceColor} font-medium">${confidence}% confidence</span>
+            </div>
+        `;
+    } else {
+        html += `
+            <div class="text-sm text-gray-500">
+                <i class="fas fa-exclamation-triangle mr-1"></i>
+                No MasterBOM sheet detected - please select manually
+            </div>
+        `;
+    }
+
+    // Show Status detection
+    if (detectedSheets.status) {
+        const confidence = Math.round((detectedSheets.confidence?.status || 0) * 100);
+        const confidenceColor = confidence >= 70 ? 'text-green-600' : confidence >= 50 ? 'text-yellow-600' : 'text-red-600';
+        html += `
+            <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-700">
+                    <i class="fas fa-chart-bar mr-1"></i>
+                    Status Sheet: <strong>${detectedSheets.status}</strong>
+                </span>
+                <span class="${confidenceColor} font-medium">${confidence}% confidence</span>
+            </div>
+        `;
+    } else {
+        html += `
+            <div class="text-sm text-gray-500">
+                <i class="fas fa-exclamation-triangle mr-1"></i>
+                No Status sheet detected - please select manually
+            </div>
+        `;
+    }
+
+    html += `
+                </div>
+                <div class="mt-3 text-xs text-blue-700">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Auto-detected sheets are pre-selected. You can change them if needed.
+                </div>
+            </div>
+        </div>
+    `;
+
+    infoPanel.innerHTML = html;
 }
 
 function checkSheetSelection() {
@@ -520,8 +615,8 @@ async function runTransform() {
         statusSheet
     });
 
-    // Show loading
-    showLoading('Running ETL transformation...');
+    // Show progress modal
+    showProgressModal();
 
     try {
         const transformRequest = {
@@ -535,6 +630,9 @@ async function runTransform() {
         };
 
         console.log('Sending transform request:', transformRequest);
+
+        // Start progress simulation
+        startProgressSimulation();
 
         const response = await fetch('/api/transform', {
             method: 'POST',
@@ -555,24 +653,193 @@ async function runTransform() {
         console.log('Transform result:', result);
 
         if (result.success) {
+            // Complete progress
+            completeProgress();
+
             // Store result in sessionStorage for results page
             sessionStorage.setItem(`transform_result_${currentFileId}`, JSON.stringify(result));
 
             showToast('ETL transformation completed successfully!', 'success');
 
-            // Redirect to results page
+            // Redirect to results page after a short delay
             setTimeout(() => {
+                hideProgressModal();
                 window.location.href = `/results?file_id=${currentFileId}`;
-            }, 1500);
+            }, 2000);
         } else {
             throw new Error(result.error || 'Transform failed');
         }
 
     } catch (error) {
         console.error('Transform error:', error);
+        hideProgressModal();
         showToast(`Transform failed: ${error.message}`, 'error');
-    } finally {
-        hideLoading();
+    }
+}
+
+// Progress Modal Functions
+let progressTimer = null;
+let progressStartTime = null;
+let currentProgressStep = 0;
+
+const progressSteps = [
+    { title: "Initializing transformation", description: "Setting up processing environment and validating input files..." },
+    { title: "Reading Excel sheets", description: "Loading MasterBOM and Status sheets from uploaded file..." },
+    { title: "Cleaning column headers", description: "Standardizing column names and removing special characters..." },
+    { title: "Validating data structure", description: "Checking data integrity and identifying key columns..." },
+    { title: "Processing MasterBOM data", description: "Cleaning part numbers and standardizing item descriptions..." },
+    { title: "Calculating plant-item-status", description: "Creating normalized plant-item-status relationships..." },
+    { title: "Resolving duplicates", description: "Applying Morocco supplier prioritization rules..." },
+    { title: "Merging data tables", description: "Combining MasterBOM and Status data with proper joins..." },
+    { title: "Generating fact tables", description: "Creating fact_parts table with dimensional relationships..." },
+    { title: "Creating dimension tables", description: "Building date dimensions and lookup tables..." },
+    { title: "Exporting processed files", description: "Saving CSV and Parquet files for analysis..." },
+    { title: "Finalizing transformation", description: "Completing data validation and generating summary..." }
+];
+
+function showProgressModal() {
+    const modal = document.getElementById('progress-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        progressStartTime = Date.now();
+        currentProgressStep = 0;
+
+        // Start timer
+        progressTimer = setInterval(updateProgressTimer, 1000);
+
+        // Initialize progress display
+        updateProgressDisplay(0);
+        initializeProgressSteps();
+    }
+}
+
+function hideProgressModal() {
+    const modal = document.getElementById('progress-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+
+        // Clear timer
+        if (progressTimer) {
+            clearInterval(progressTimer);
+            progressTimer = null;
+        }
+    }
+}
+
+function updateProgressTimer() {
+    if (!progressStartTime) return;
+
+    const elapsed = Math.floor((Date.now() - progressStartTime) / 1000);
+    const minutes = Math.floor(elapsed / 60);
+    const seconds = elapsed % 60;
+
+    const timerElement = document.getElementById('progress-timer');
+    if (timerElement) {
+        timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+}
+
+function updateProgressDisplay(percentage) {
+    const progressBar = document.getElementById('progress-bar');
+    const progressPercentage = document.getElementById('progress-percentage');
+
+    if (progressBar) {
+        progressBar.style.width = `${percentage}%`;
+    }
+
+    if (progressPercentage) {
+        progressPercentage.textContent = `${Math.round(percentage)}%`;
+    }
+}
+
+function initializeProgressSteps() {
+    const stepsContainer = document.getElementById('progress-steps');
+    if (!stepsContainer) return;
+
+    stepsContainer.innerHTML = '';
+
+    progressSteps.forEach((step, index) => {
+        const stepElement = document.createElement('div');
+        stepElement.id = `progress-step-${index}`;
+        stepElement.className = 'flex items-start space-x-3 p-3 rounded-lg transition-all duration-300';
+
+        stepElement.innerHTML = `
+            <div class="flex-shrink-0 mt-1">
+                <div class="w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center">
+                    <i class="fas fa-circle text-gray-300 text-xs"></i>
+                </div>
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-gray-900">${step.title}</div>
+                <div class="text-xs text-gray-500 mt-1">${step.description}</div>
+            </div>
+        `;
+
+        stepsContainer.appendChild(stepElement);
+    });
+}
+
+function startProgressSimulation() {
+    let progress = 0;
+    const totalSteps = progressSteps.length;
+    const stepDuration = 2000; // 2 seconds per step
+
+    const progressInterval = setInterval(() => {
+        if (currentProgressStep < totalSteps) {
+            // Update current step
+            updateProgressStep(currentProgressStep, 'active');
+
+            // Calculate progress
+            progress = ((currentProgressStep + 1) / totalSteps) * 90; // Leave 10% for completion
+            updateProgressDisplay(progress);
+
+            currentProgressStep++;
+        } else {
+            clearInterval(progressInterval);
+        }
+    }, stepDuration);
+}
+
+function updateProgressStep(stepIndex, status) {
+    const stepElement = document.getElementById(`progress-step-${stepIndex}`);
+    if (!stepElement) return;
+
+    const icon = stepElement.querySelector('i');
+    const circle = stepElement.querySelector('.w-6');
+
+    switch (status) {
+        case 'active':
+            stepElement.className = 'flex items-start space-x-3 p-3 rounded-lg bg-blue-50 border border-blue-200 transition-all duration-300';
+            circle.className = 'w-6 h-6 rounded-full border-2 border-blue-500 bg-blue-500 flex items-center justify-center';
+            icon.className = 'fas fa-spinner fa-spin text-white text-xs';
+            break;
+        case 'completed':
+            stepElement.className = 'flex items-start space-x-3 p-3 rounded-lg bg-green-50 border border-green-200 transition-all duration-300';
+            circle.className = 'w-6 h-6 rounded-full border-2 border-green-500 bg-green-500 flex items-center justify-center';
+            icon.className = 'fas fa-check text-white text-xs';
+            break;
+        case 'pending':
+        default:
+            stepElement.className = 'flex items-start space-x-3 p-3 rounded-lg transition-all duration-300';
+            circle.className = 'w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center';
+            icon.className = 'fas fa-circle text-gray-300 text-xs';
+            break;
+    }
+}
+
+function completeProgress() {
+    // Mark all steps as completed
+    for (let i = 0; i < progressSteps.length; i++) {
+        updateProgressStep(i, 'completed');
+    }
+
+    // Set progress to 100%
+    updateProgressDisplay(100);
+
+    // Update modal header
+    const header = document.querySelector('#progress-modal h3');
+    if (header) {
+        header.innerHTML = '<i class="fas fa-check-circle mr-2 text-green-400"></i>ETL Transformation Complete';
     }
 }
 
@@ -585,5 +852,7 @@ window.ETLDashboard = {
     escapeHtml,
     enableStep,
     resetSteps,
-    runTransform
+    runTransform,
+    showProgressModal,
+    hideProgressModal
 };

@@ -136,35 +136,7 @@ def get_pipeline_status(file_id):
         }), 500
 
 
-@app.route('/api/powerbi/open', methods=['POST'])
-def open_powerbi_dashboard():
-    """Open PowerBI dashboard via API proxy."""
-    try:
-        response = requests.post(
-            f"{FASTAPI_BASE_URL}/api/powerbi/open",
-            json={},
-            timeout=30
-        )
 
-        if response.status_code == 200:
-            return jsonify(response.json())
-        else:
-            return jsonify({
-                "success": False,
-                "error": f"Backend returned status {response.status_code}",
-                "details": response.text
-            }), response.status_code
-
-    except requests.exceptions.RequestException as e:
-        return jsonify({
-            "success": False,
-            "error": f"Failed to open PowerBI dashboard: {str(e)}"
-        }), 500
-    except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": f"Unexpected error: {str(e)}"
-        }), 500
 
 
 @app.route('/api/powerbi/templates')

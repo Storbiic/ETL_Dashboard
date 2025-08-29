@@ -42,12 +42,208 @@
         </div>
     </div>
 
+    <!-- Interactive Dashboard Preview -->
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-lg font-semibold text-gray-900">
+                <i class="fas fa-chart-line mr-2 text-blue-600"></i>
+                Interactive Dashboard Preview
+            </h2>
+            <div class="flex space-x-2">
+                <button id="refreshDashboardBtn" class="bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm">
+                    <i class="fas fa-sync mr-1"></i>
+                    Refresh
+                </button>
+                <button id="fullscreenDashboardBtn" class="bg-gray-600 text-white px-3 py-2 rounded-md hover:bg-gray-700 transition-colors text-sm">
+                    <i class="fas fa-expand mr-1"></i>
+                    Fullscreen
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard Loading State -->
+        <div id="dashboard-loading" class="flex items-center justify-center py-12">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span class="ml-3 text-gray-600">Loading dashboard data...</span>
+        </div>
+
+        <!-- Dashboard Content -->
+        <div id="dashboard-content" class="hidden">
+            <!-- KPIs Row -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-4 text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-blue-100 text-sm">Total Parts</p>
+                            <p id="kpi-total-parts" class="text-2xl font-bold">-</p>
+                        </div>
+                        <i class="fas fa-cogs text-blue-200 text-2xl"></i>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-4 text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-green-100 text-sm">Active Parts</p>
+                            <p id="kpi-active-parts" class="text-2xl font-bold">-</p>
+                        </div>
+                        <i class="fas fa-check-circle text-green-200 text-2xl"></i>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg p-4 text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-yellow-100 text-sm">Discontinued</p>
+                            <p id="kpi-discontinued-parts" class="text-2xl font-bold">-</p>
+                        </div>
+                        <i class="fas fa-exclamation-triangle text-yellow-200 text-2xl"></i>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg p-4 text-white">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-purple-100 text-sm">Suppliers</p>
+                            <p id="kpi-suppliers" class="text-2xl font-bold">-</p>
+                        </div>
+                        <i class="fas fa-building text-purple-200 text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row 1 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <!-- Status Distribution Donut Chart -->
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <h3 class="text-md font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-chart-pie mr-2 text-blue-600"></i>
+                        Status Distribution
+                    </h3>
+                    <div class="relative h-64">
+                        <canvas id="statusDonutChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Top Suppliers Bar Chart -->
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <h3 class="text-md font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-chart-bar mr-2 text-green-600"></i>
+                        Top Suppliers by Parts Count
+                    </h3>
+                    <div class="relative h-64">
+                        <canvas id="suppliersBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row 2 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <!-- Project Plants Status -->
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <h3 class="text-md font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-industry mr-2 text-purple-600"></i>
+                        Project Plants Overview
+                    </h3>
+                    <div class="relative h-64">
+                        <canvas id="plantsChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Quality Metrics -->
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <h3 class="text-md font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-award mr-2 text-orange-600"></i>
+                        Quality Supplier Metrics
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center p-3 bg-white rounded border">
+                            <span class="text-sm font-medium">Morocco Suppliers Priority</span>
+                            <span id="morocco-priority" class="text-green-600 font-bold">-</span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-white rounded border">
+                            <span class="text-sm font-medium">Duplicate Resolution Rate</span>
+                            <span id="duplicate-resolution" class="text-blue-600 font-bold">-</span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-white rounded border">
+                            <span class="text-sm font-medium">Data Quality Score</span>
+                            <span id="data-quality" class="text-purple-600 font-bold">-</span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-white rounded border">
+                            <span class="text-sm font-medium">Processing Efficiency</span>
+                            <span id="processing-efficiency" class="text-orange-600 font-bold">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Grid -->
+            <div class="bg-gray-50 rounded-lg p-4">
+                <h3 class="text-md font-semibold text-gray-900 mb-4">
+                    <i class="fas fa-table mr-2 text-gray-600"></i>
+                    Project Status Matrix
+                </h3>
+                <div class="overflow-x-auto">
+                    <div id="status-matrix" class="min-w-full">
+                        <!-- Status matrix will be populated dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Download Artifacts -->
     <div class="bg-white rounded-lg shadow p-6">
         <h2 class="text-lg font-semibold text-gray-900 mb-4">
             <i class="fas fa-download mr-2 text-blue-600"></i>
             Download Files
         </h2>
+
+        <!-- File Categories Documentation -->
+        <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-cogs text-blue-600 text-lg mt-1"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h4 class="text-sm font-semibold text-blue-900 mb-2">Pipeline Output Files</h4>
+                        <p class="text-sm text-blue-800">
+                            Ready-to-use files optimized for business intelligence tools and reporting.
+                            These files include cleaned data with proper relationships, standardized formats,
+                            and are ideal for direct import into analytics platforms.
+                        </p>
+                        <div class="mt-2 text-xs text-blue-700">
+                            <i class="fas fa-check mr-1"></i> Optimized for BI tools
+                            <br>
+                            <i class="fas fa-check mr-1"></i> Standardized formats
+                            <br>
+                            <i class="fas fa-check mr-1"></i> Ready for reporting
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-database text-green-600 text-lg mt-1"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h4 class="text-sm font-semibold text-green-900 mb-2">Processed Files</h4>
+                        <p class="text-sm text-green-800">
+                            Cleaned and transformed raw data files for advanced analysis and custom integrations.
+                            These files contain the complete processed dataset with all transformations applied,
+                            perfect for data scientists and advanced users.
+                        </p>
+                        <div class="mt-2 text-xs text-green-700">
+                            <i class="fas fa-check mr-1"></i> Complete datasets
+                            <br>
+                            <i class="fas fa-check mr-1"></i> Advanced analysis ready
+                            <br>
+                            <i class="fas fa-check mr-1"></i> Custom integration support
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Download Actions -->
         <div class="mb-4 flex flex-wrap gap-3">
@@ -95,41 +291,7 @@
         </div>
     </div>
 
-    <!-- Power BI Integration -->
-    <div class="bg-white rounded-lg shadow p-6">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">
-            <i class="fas fa-chart-line mr-2 text-blue-600"></i>
-            Power BI Integration
-        </h2>
-        
-        <!-- PowerBI Dashboard Actions -->
-        <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h3 class="font-medium text-blue-900 mb-1">
-                        <i class="fas fa-rocket mr-2"></i>
-                        Quick Start Dashboard
-                    </h3>
-                    <p class="text-sm text-blue-700">Open your data directly in PowerBI Desktop with pre-configured templates</p>
-                </div>
-                <div class="flex space-x-3">
-                    <button id="openPowerBIBtn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors">
-                        <i class="fas fa-external-link-alt mr-2"></i>
-                        Open PowerBI
-                    </button>
-                    <button id="refreshPipelineBtn" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors">
-                        <i class="fas fa-sync mr-2"></i>
-                        Refresh
-                    </button>
-                </div>
-            </div>
-            <div id="powerbiStatus" class="mt-3 text-sm">
-                <div class="flex items-center text-gray-600">
-                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                    Loading PowerBI integration status...
-                </div>
-            </div>
-        </div>
+
 
         <!-- Pipeline Output Status -->
         <div id="pipelineSection" class="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
@@ -145,28 +307,8 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="p-4 border border-gray-200 rounded-lg">
-                <h3 class="font-medium text-gray-900 mb-2">
-                    <i class="fas fa-plug mr-2 text-green-600"></i>
-                    Data Connectors
-                </h3>
-                <p class="text-sm text-gray-600 mb-3">Power Query M scripts to connect to your processed data</p>
-                <a href="/download/power_query_connectors.md" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                    Download Connectors <i class="fas fa-external-link-alt ml-1"></i>
-                </a>
-            </div>
+        <div class="grid grid-cols-1 gap-4">
 
-            <div class="p-4 border border-gray-200 rounded-lg">
-                <h3 class="font-medium text-gray-900 mb-2">
-                    <i class="fas fa-calculator mr-2 text-purple-600"></i>
-                    DAX Measures
-                </h3>
-                <p class="text-sm text-gray-600 mb-3">Pre-built DAX measures for common analytics</p>
-                <a href="/download/measures_dax.md" class="text-blue-600 hover:text-blue-800 text-sm font-medium">
-                    Download Measures <i class="fas fa-external-link-alt ml-1"></i>
-                </a>
-            </div>
 
             <div class="p-4 border border-gray-200 rounded-lg">
                 <h3 class="font-medium text-gray-900 mb-2">
@@ -190,9 +332,6 @@ const FASTAPI_URL = '{{ fastapi_url }}';
 let transformResult = null;
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize PowerBI integration
-    initializePowerBIIntegration();
-
     // Initialize download functionality
     initializeDownloadFunctionality();
 
@@ -369,156 +508,11 @@ function renderLog(messages) {
     container.innerHTML = html;
 }
 
-// PowerBI Integration Functions
-function initializePowerBIIntegration() {
-    // Add event listeners for PowerBI buttons
-    const openPowerBIBtn = document.getElementById('openPowerBIBtn');
-    const refreshPipelineBtn = document.getElementById('refreshPipelineBtn');
 
-    if (openPowerBIBtn) {
-        openPowerBIBtn.addEventListener('click', openPowerBIDashboard);
-    }
 
-    if (refreshPipelineBtn) {
-        refreshPipelineBtn.addEventListener('click', refreshPipelineStatus);
-    }
 
-    // Load initial status
-    loadPowerBIStatus();
-    loadPipelineStatus();
-}
 
-async function openPowerBIDashboard() {
-    const button = document.getElementById('openPowerBIBtn');
-    const originalText = button.innerHTML;
 
-    try {
-        // Show loading state
-        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Opening...';
-        button.disabled = true;
-
-        const response = await fetch('/api/powerbi/open', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            updatePowerBIStatus('success', 'PowerBI Desktop opened successfully!');
-        } else {
-            updatePowerBIStatus('error', result.error || 'Failed to open PowerBI Desktop');
-        }
-
-    } catch (error) {
-        console.error('Error opening PowerBI:', error);
-        updatePowerBIStatus('error', 'Failed to open PowerBI Desktop: ' + error.message);
-    } finally {
-        // Restore button
-        button.innerHTML = originalText;
-        button.disabled = false;
-    }
-}
-
-async function loadPowerBIStatus() {
-    try {
-        const response = await fetch('/api/powerbi/templates');
-        const data = await response.json();
-
-        if (data.templates && data.templates.length > 0) {
-            const latestTemplate = data.templates[0];
-            updatePowerBIStatus('ready', `Template ready: ${latestTemplate.name}`);
-        } else {
-            updatePowerBIStatus('warning', 'No PowerBI templates found');
-        }
-
-    } catch (error) {
-        console.error('Error loading PowerBI status:', error);
-        updatePowerBIStatus('error', 'Failed to load PowerBI status');
-    }
-}
-
-async function loadPipelineStatus() {
-    try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const fileId = urlParams.get('file_id');
-
-        if (!fileId) {
-            updatePipelineStatus('warning', 'No file ID available');
-            return;
-        }
-
-        const response = await fetch(`/api/pipeline/${fileId}/status`);
-        const data = await response.json();
-
-        if (data.error) {
-            updatePipelineStatus('error', data.error);
-        } else {
-            const filesCount = data.pipeline_files ? data.pipeline_files.length : 0;
-            const templatesCount = data.template_files ? data.template_files.length : 0;
-
-            updatePipelineStatus('success',
-                `Pipeline ready: ${filesCount} files, ${templatesCount} templates`);
-        }
-
-    } catch (error) {
-        console.error('Error loading pipeline status:', error);
-        updatePipelineStatus('error', 'Failed to load pipeline status');
-    }
-}
-
-async function refreshPipelineStatus() {
-    const button = document.getElementById('refreshPipelineBtn');
-    const originalText = button.innerHTML;
-
-    try {
-        button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Refreshing...';
-        button.disabled = true;
-
-        await Promise.all([loadPowerBIStatus(), loadPipelineStatus()]);
-
-    } finally {
-        button.innerHTML = originalText;
-        button.disabled = false;
-    }
-}
-
-function updatePowerBIStatus(type, message) {
-    const statusElement = document.getElementById('powerbiStatus');
-
-    const iconClass = {
-        'success': 'fas fa-check-circle text-green-600',
-        'error': 'fas fa-exclamation-circle text-red-600',
-        'warning': 'fas fa-exclamation-triangle text-yellow-600',
-        'ready': 'fas fa-chart-bar text-blue-600'
-    }[type] || 'fas fa-info-circle text-gray-600';
-
-    statusElement.innerHTML = `
-        <div class="flex items-center">
-            <i class="${iconClass} mr-2"></i>
-            <span class="text-sm">${message}</span>
-        </div>
-    `;
-}
-
-function updatePipelineStatus(type, message) {
-    const statusElement = document.getElementById('pipelineStatus');
-
-    const iconClass = {
-        'success': 'fas fa-check-circle text-green-600',
-        'error': 'fas fa-exclamation-circle text-red-600',
-        'warning': 'fas fa-exclamation-triangle text-yellow-600'
-    }[type] || 'fas fa-info-circle text-gray-600';
-
-    statusElement.innerHTML = `
-        <div class="flex items-center">
-            <i class="${iconClass} mr-2"></i>
-            <span class="text-sm">${message}</span>
-        </div>
-    `;
-}
 
 // Download Functionality
 function initializeDownloadFunctionality() {

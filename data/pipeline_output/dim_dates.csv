@@ -1,13 +1,4 @@
 date,role,year,month,day,quarter,week,weekday,month_name,day_name
-2138-01-01,Supplier PN,2138,1,1,1,1,2,January,Wednesday
-2109-01-01,Supplier PN,2109,1,1,1,1,1,January,Tuesday
-2021-01-16,Supplier PN,2021,1,16,1,2,5,January,Saturday
-2002-03-19,Supplier PN,2002,3,19,1,12,1,March,Tuesday
-2027-01-16,Original Supplier PN,2027,1,16,1,2,5,January,Saturday
-2021-01-16,Original Supplier PN,2021,1,16,1,2,5,January,Saturday
-2138-01-01,Original Supplier PN,2138,1,1,1,1,2,January,Wednesday
-2109-01-01,Original Supplier PN,2109,1,1,1,1,1,January,Tuesday
-2002-03-19,Original Supplier PN,2002,3,19,1,12,1,March,Tuesday
 2019-10-18,Approved Date,2019,10,18,4,42,4,October,Friday
 2016-08-30,Approved Date,2016,8,30,3,35,1,August,Tuesday
 2019-02-01,Approved Date,2019,2,1,1,5,4,February,Friday
