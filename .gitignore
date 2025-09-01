@@ -59,18 +59,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Data files (uploaded/processed data)
-data/uploads/*.xlsx
-data/uploads/*.xls
-data/uploads/*.csv
-data/processed/*.xlsx
-data/processed/*.xls
-data/processed/*.csv
-data/processed/*.parquet
-
-# Keep directory structure but ignore files
-data/uploads/.gitkeep
-data/processed/.gitkeep
+# Data files (uploaded/processed data) - Exclude entire data folder
+data/
+!data/.gitkeep
+!data/uploads/.gitkeep
+!data/processed/.gitkeep
+!data/pipeline_output/.gitkeep
 
 # Test files
 test_*.html
