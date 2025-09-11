@@ -4,18 +4,433 @@
 let currentFileId = null;
 let currentStep = 1;
 let uploadedSheets = [];
+let logEntries = [];
+let logPanelOpen = false;
+let startTime = null;
+let timerInterval = null;
 
 // API base URL (will be set from template)
-const FASTAPI_URL = window.FASTAPI_URL || 'http://127.0.0.1:8000';
+let FASTAPI_URL = window.FASTAPI_URL || 'http://127.0.0.1:8000';
 console.log('FASTAPI_URL set to:', FASTAPI_URL);
+
+// Step configuration
+const STEPS = {
+    1: { name: 'Upload Excel Workbook', description: 'Select and upload your Excel file' },
+    2: { name: 'Select & Preview Sheets', description: 'Choose MasterBOM and Status sheets' },
+    3: { name: 'Profile Data Quality', description: 'Analyze data structure and quality' },
+    4: { name: 'Transform & Export', description: 'Run ETL process and download results' }
+};
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM Content Loaded - Initializing application...');
     initializeUpload();
     initializeSheetSelection();
+    initializeLogPanel();
+    initializeProgressTracking();
     console.log('Application initialized');
 });
+
+// Utility Functions
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function showLoading(message = 'Loading...') {
+    // Implementation for loading state
+    console.log('Loading:', message);
+}
+
+// Global functions for template access
+window.toggleLogPanel = toggleLogPanel;
+window.ETLDashboard = {
+    toggleLogPanel: toggleLogPanel,
+    addLogEntry: addLogEntry,
+    clearLogs: clearLogs,
+    showToast: showToast,
+    updateStepProgress: updateStepProgress,
+    runTransform: runTransform,
+    formatFileSize: formatFileSize
+};
+
+// ETL Transform Function
+async function runTransform() {
+    const transformBtn = document.getElementById('run-transform-btn');
+    const transformProgress = document.getElementById('transform-progress');
+    const progressBar = document.getElementById('transform-progress-bar');
+    const statusText = document.getElementById('transform-status');
+    const percentageText = document.getElementById('transform-percentage');
+    const timerText = document.getElementById('transform-timer');
+
+    // Get selected sheets from URL params or stored values
+    const urlParams = new URLSearchParams(window.location.search);
+    const masterSheet = urlParams.get('master_sheet') || localStorage.getItem('selectedMasterSheet');
+    const statusSheet = urlParams.get('status_sheet') || localStorage.getItem('selectedStatusSheet');
+    const fileId = urlParams.get('file_id') || currentFileId;
+
+    if (!fileId || !masterSheet || !statusSheet) {
+        addLogEntry('ERROR', 'Missing required parameters for ETL transformation');
+        showToast('Missing file or sheet information. Please start over.', 'error');
+        return;
+    }
+
+    // Disable button and show progress
+    transformBtn.disabled = true;
+    transformBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing...';
+    transformProgress.classList.remove('hidden');
+
+    // Start timer
+    const transformStartTime = new Date();
+    const transformTimer = setInterval(() => {
+        const elapsed = Math.floor((new Date() - transformStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        if (timerText) {
+            timerText.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+    }, 1000);
+
+    updateStepProgress(4, 0, 'current');
+    addLogEntry('INFO', 'Starting ETL transformation process...');
+
+    try {
+        // Prepare transform request
+        const transformData = {
+            file_id: fileId,
+            master_sheet: masterSheet,
+            status_sheet: statusSheet,
+            options: {
+                date_cols: ["Approved Date", "Promised Date", "PSW Date OK", "FAR Promised date"],
+                id_col: "YAZAKI PN"
+            }
+        };
+
+        addLogEntry('INFO', `Transform request: MasterBOM="${masterSheet}", Status="${statusSheet}"`);
+        updateStepProgress(4, 10, 'current');
+
+        if (statusText) statusText.textContent = 'Sending transform request...';
+        if (percentageText) percentageText.textContent = '10%';
+        if (progressBar) progressBar.style.width = '10%';
+
+        // Send transform request
+        const response = await fetch(`${FASTAPI_URL}/api/transform`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(transformData)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Transform failed');
+        }
+
+        // Simulate progress updates for better UX
+        const progressStages = [
+            { progress: 25, status: 'Reading Excel sheets...' },
+            { progress: 40, status: 'Cleaning data...' },
+            { progress: 55, status: 'Applying business rules...' },
+            { progress: 70, status: 'Creating normalized tables...' },
+            { progress: 85, status: 'Generating outputs...' },
+            { progress: 95, status: 'Finalizing...' }
+        ];
+
+        for (const stage of progressStages) {
+            await new Promise(resolve => setTimeout(resolve, 800));
+            updateStepProgress(4, stage.progress, 'current');
+            if (statusText) statusText.textContent = stage.status;
+            if (percentageText) percentageText.textContent = `${stage.progress}%`;
+            if (progressBar) progressBar.style.width = `${stage.progress}%`;
+            addLogEntry('INFO', stage.status);
+        }
+
+        const result = await response.json();
+
+        // Complete the transformation
+        clearInterval(transformTimer);
+        updateStepProgress(4, 100, 'completed');
+
+        if (statusText) statusText.textContent = 'Transform completed successfully!';
+        if (percentageText) percentageText.textContent = '100%';
+        if (progressBar) progressBar.style.width = '100%';
+
+        addLogEntry('SUCCESS', `ETL transformation completed successfully!`);
+        addLogEntry('INFO', `Generated ${result.artifacts?.length || 0} output files`);
+
+        // Show success message and redirect to results
+        showToast('ETL transformation completed successfully!', 'success');
+
+        setTimeout(() => {
+            window.location.href = `/results?file_id=${fileId}&master_sheet=${encodeURIComponent(masterSheet)}&status_sheet=${encodeURIComponent(statusSheet)}`;
+        }, 2000);
+
+    } catch (error) {
+        clearInterval(transformTimer);
+        console.error('Transform error:', error);
+
+        updateStepProgress(4, 0, 'error');
+        addLogEntry('ERROR', `Transform failed: ${error.message}`);
+
+        if (statusText) statusText.textContent = 'Transform failed';
+        if (percentageText) percentageText.textContent = 'Error';
+        if (progressBar) {
+            progressBar.style.width = '100%';
+            progressBar.className = progressBar.className.replace('from-green-500 to-blue-500', 'from-red-500 to-red-600');
+        }
+
+        showToast(`Transform failed: ${error.message}`, 'error');
+
+        // Re-enable button
+        transformBtn.disabled = false;
+        transformBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Retry Transform';
+    }
+}
+
+// Log Panel Management
+function initializeLogPanel() {
+    const toggleBtn = document.getElementById('toggle-log-panel');
+    const showBtn = document.getElementById('show-log-panel');
+    const clearBtn = document.getElementById('clear-logs');
+
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', toggleLogPanel);
+    }
+
+    if (showBtn) {
+        showBtn.addEventListener('click', toggleLogPanel);
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', clearLogs);
+    }
+}
+
+function toggleLogPanel() {
+    const panel = document.getElementById('log-panel');
+    const showBtn = document.getElementById('show-log-panel');
+    const toggleBtn = document.getElementById('toggle-log-panel');
+
+    logPanelOpen = !logPanelOpen;
+
+    if (logPanelOpen) {
+        panel.classList.add('open');
+        panel.style.transform = 'translateX(0)';
+        showBtn.style.transform = 'translateX(100%)';
+
+        // Update main content margin
+        const mainContent = document.getElementById('main-content');
+        mainContent.style.marginRight = '24rem';
+
+        // Update toggle button icon
+        if (toggleBtn) {
+            toggleBtn.innerHTML = '<i class="fas fa-times"></i>';
+        }
+    } else {
+        panel.classList.remove('open');
+        panel.style.transform = 'translateX(100%)';
+        showBtn.style.transform = 'translateX(0)';
+
+        // Reset main content margin
+        const mainContent = document.getElementById('main-content');
+        mainContent.style.marginRight = '0';
+
+        // Update toggle button icon
+        if (toggleBtn) {
+            toggleBtn.innerHTML = '<i class="fas fa-terminal"></i>';
+        }
+    }
+}
+
+function addLogEntry(level, message, timestamp = null) {
+    const logContainer = document.getElementById('log-entries');
+    const logCount = document.getElementById('log-count');
+    const logNotification = document.getElementById('log-notification');
+
+    if (!timestamp) {
+        timestamp = new Date().toLocaleTimeString();
+    }
+
+    const entry = {
+        level: level.toLowerCase(),
+        message,
+        timestamp,
+        id: Date.now()
+    };
+
+    logEntries.push(entry);
+
+    // Create log entry element
+    const entryElement = document.createElement('div');
+    entryElement.className = `log-entry ${entry.level}`;
+    entryElement.innerHTML = `
+        <div class="flex-shrink-0 mr-3">
+            <div class="log-level ${entry.level}">${level.toUpperCase()}</div>
+        </div>
+        <div class="flex-1">
+            <div class="text-sm font-medium">${message}</div>
+            <div class="log-timestamp mt-1">${timestamp}</div>
+        </div>
+    `;
+
+    // Remove placeholder if it exists
+    const placeholder = logContainer.querySelector('.text-center');
+    if (placeholder) {
+        placeholder.remove();
+    }
+
+    // Add new entry
+    logContainer.appendChild(entryElement);
+
+    // Auto-scroll if enabled
+    const autoScroll = document.getElementById('auto-scroll-logs');
+    if (autoScroll && autoScroll.checked) {
+        logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    // Update log count
+    if (logCount) {
+        logCount.textContent = `${logEntries.length} entries`;
+    }
+
+    // Update notification badge
+    if (logNotification && !logPanelOpen) {
+        logNotification.textContent = logEntries.length;
+        logNotification.classList.remove('hidden');
+    }
+
+    // Animate entry
+    entryElement.style.opacity = '0';
+    entryElement.style.transform = 'translateX(20px)';
+    setTimeout(() => {
+        entryElement.style.transition = 'all 0.3s ease-out';
+        entryElement.style.opacity = '1';
+        entryElement.style.transform = 'translateX(0)';
+    }, 10);
+}
+
+function clearLogs() {
+    const logContainer = document.getElementById('log-entries');
+    const logCount = document.getElementById('log-count');
+    const logNotification = document.getElementById('log-notification');
+
+    logEntries = [];
+    logContainer.innerHTML = `
+        <div class="text-center text-gray-500 text-sm py-8">
+            <i class="fas fa-info-circle mb-2"></i>
+            <p>No logs yet. Start an ETL process to see real-time updates.</p>
+        </div>
+    `;
+
+    if (logCount) {
+        logCount.textContent = '0 entries';
+    }
+
+    if (logNotification) {
+        logNotification.classList.add('hidden');
+    }
+}
+
+// Progress Tracking
+function initializeProgressTracking() {
+    startTime = new Date();
+    updateTimer();
+    timerInterval = setInterval(updateTimer, 1000);
+}
+
+function updateTimer() {
+    if (!startTime) return;
+
+    const elapsed = Math.floor((new Date() - startTime) / 1000);
+    const minutes = Math.floor(elapsed / 60);
+    const seconds = elapsed % 60;
+
+    const timerElement = document.getElementById('elapsed-time');
+    if (timerElement) {
+        timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+}
+
+function updateStepProgress(step, percentage = 0, status = 'pending') {
+    const stepElement = document.getElementById(`step-${step}`);
+    const stepCheckElement = document.getElementById(`step-${step}-check`);
+    const stepStatusElement = document.getElementById(`step-${step}-status`);
+    const stepNameElement = document.getElementById('current-step-name');
+    const stepPercentageElement = document.getElementById('step-percentage');
+    const overallProgressElement = document.getElementById('overall-progress');
+
+    // Update current step name
+    if (stepNameElement && STEPS[step]) {
+        stepNameElement.textContent = `Step ${step}: ${STEPS[step].name}`;
+    }
+
+    // Update step status
+    if (stepStatusElement) {
+        const statusText = {
+            'pending': 'Pending',
+            'current': 'In Progress',
+            'completed': 'Completed',
+            'error': 'Error'
+        };
+        stepStatusElement.textContent = statusText[status] || status;
+        stepStatusElement.className = `text-xs font-medium mt-1 ${
+            status === 'completed' ? 'text-green-600' :
+            status === 'current' ? 'text-blue-600' :
+            status === 'error' ? 'text-red-600' :
+            'text-gray-400'
+        }`;
+    }
+
+    // Update step indicator
+    if (stepElement) {
+        stepElement.className = `flex items-center justify-center w-12 h-12 rounded-full font-semibold transition-all duration-300 ${
+            status === 'completed' ? 'bg-green-600 text-white shadow-lg' :
+            status === 'current' ? 'bg-blue-600 text-white shadow-lg' :
+            status === 'error' ? 'bg-red-600 text-white shadow-lg' :
+            'bg-gray-300 text-gray-600'
+        }`;
+    }
+
+    // Show/hide check mark
+    if (stepCheckElement) {
+        if (status === 'completed') {
+            stepCheckElement.style.opacity = '1';
+            stepCheckElement.style.transform = 'scale(1)';
+        } else {
+            stepCheckElement.style.opacity = '0';
+            stepCheckElement.style.transform = 'scale(0)';
+        }
+    }
+
+    // Update overall progress
+    const overallPercentage = ((step - 1) * 25) + (percentage * 0.25);
+    if (overallProgressElement) {
+        overallProgressElement.style.width = `${overallPercentage}%`;
+    }
+
+    if (stepPercentageElement) {
+        stepPercentageElement.textContent = `${Math.round(overallPercentage)}% Complete`;
+    }
+
+    // Update progress between steps
+    if (step > 1) {
+        const prevProgressElement = document.getElementById(`progress-${step-1}-${step}`);
+        if (prevProgressElement) {
+            prevProgressElement.style.width = '100%';
+        }
+    }
+
+    if (percentage > 0 && step < 4) {
+        const currentProgressElement = document.getElementById(`progress-${step}-${step+1}`);
+        if (currentProgressElement) {
+            currentProgressElement.style.width = `${percentage}%`;
+        }
+    }
+}
 
 // File Upload Functions
 function initializeUpload() {
@@ -94,9 +509,21 @@ async function uploadFile(file) {
 
     // Validate file type
     if (!file.name.toLowerCase().endsWith('.xlsx') && !file.name.toLowerCase().endsWith('.xls')) {
+        addLogEntry('ERROR', 'Invalid file type. Please select an Excel file (.xlsx or .xls)');
         showToast('Please select an Excel file (.xlsx or .xls)', 'error');
         return;
     }
+
+    // Validate file size (50MB limit)
+    const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+    if (file.size > maxSize) {
+        addLogEntry('ERROR', `File too large: ${formatFileSize(file.size)}. Maximum size is 50MB.`);
+        showToast('File too large. Maximum size is 50MB.', 'error');
+        return;
+    }
+
+    addLogEntry('INFO', `Starting upload: ${file.name} (${formatFileSize(file.size)})`);
+    updateStepProgress(1, 10, 'current');
 
     // Show upload progress
     showUploadProgress();
@@ -106,6 +533,7 @@ async function uploadFile(file) {
         formData.append('file', file);
 
         console.log('Sending request to:', '/api/upload');
+        addLogEntry('INFO', 'Uploading file to server...');
 
         const response = await fetch('/api/upload', {
             method: 'POST',
@@ -113,58 +541,120 @@ async function uploadFile(file) {
         });
 
         console.log('Response status:', response.status);
-        
+        updateStepProgress(1, 70, 'current');
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.detail || 'Upload failed');
         }
-        
+
         const result = await response.json();
         console.log('Upload response:', result);
+
+        addLogEntry('SUCCESS', `File uploaded successfully. Found ${result.sheet_names.length} sheets.`);
+        updateStepProgress(1, 90, 'current');
 
         // Store file info
         currentFileId = result.file_id;
         uploadedSheets = result.sheet_names;
-        console.log('Stored file info:', { currentFileId, uploadedSheets });
+        window.lastDetectedSheets = result.detected_sheets; // Store for override detection
+        console.log('Stored file info:', { currentFileId, uploadedSheets, detectedSheets: result.detected_sheets });
 
-        // Show file info
-        showFileInfo(result);
+        // Show processing state
+        showProcessingState();
 
-        // Enable next step
-        enableStep(2);
-        populateSheetSelectors(result.sheet_names, result.detected_sheets);
+        // Simulate processing time for better UX
+        setTimeout(() => {
+            // Show file info
+            showFileInfo(result);
 
-        showToast('File uploaded successfully!', 'success');
-        
+            // Complete step 1
+            updateStepProgress(1, 100, 'completed');
+
+            // Enable next step
+            enableStep(2);
+            populateSheetSelectors(result.sheet_names, result.detected_sheets);
+
+            addLogEntry('INFO', 'Ready for sheet selection. Please choose MasterBOM and Status sheets.');
+            showToast('File uploaded successfully!', 'success');
+        }, 1000);
+
     } catch (error) {
         console.error('Upload error:', error);
+        addLogEntry('ERROR', `Upload failed: ${error.message}`);
+        updateStepProgress(1, 0, 'error');
         showToast(`Upload failed: ${error.message}`, 'error');
         hideUploadProgress();
     }
 }
 
 function showUploadProgress() {
-    document.getElementById('upload-area').classList.add('hidden');
-    document.getElementById('upload-progress').classList.remove('hidden');
-    
-    // Simulate progress (in real implementation, you'd track actual progress)
+    const uploadArea = document.getElementById('upload-area');
+    const uploadProgress = document.getElementById('upload-progress');
+    const processingState = document.getElementById('processing-state');
+
+    uploadArea.classList.add('hidden');
+    uploadProgress.classList.remove('hidden');
+    processingState.classList.add('hidden');
+
+    // Enhanced progress simulation with realistic stages
     let progress = 0;
     const progressBar = document.getElementById('upload-progress-bar');
-    
+    const statusText = document.getElementById('upload-status');
+    const percentageText = document.getElementById('upload-percentage');
+
+    const stages = [
+        { progress: 20, status: 'Preparing upload...' },
+        { progress: 40, status: 'Uploading file...' },
+        { progress: 60, status: 'Validating file...' },
+        { progress: 80, status: 'Processing sheets...' },
+        { progress: 95, status: 'Almost done...' }
+    ];
+
+    let stageIndex = 0;
+
     const interval = setInterval(() => {
-        progress += Math.random() * 30;
-        if (progress >= 100) {
-            progress = 100;
+        progress += Math.random() * 8 + 2; // More realistic progress increments
+
+        // Update stage status
+        if (stageIndex < stages.length && progress >= stages[stageIndex].progress) {
+            if (statusText) statusText.textContent = stages[stageIndex].status;
+            stageIndex++;
+        }
+
+        if (progress >= 95) {
+            progress = 95; // Stop at 95% until actual completion
             clearInterval(interval);
         }
-        progressBar.style.width = `${progress}%`;
-    }, 200);
+
+        if (progressBar) progressBar.style.width = `${progress}%`;
+        if (percentageText) percentageText.textContent = `${Math.round(progress)}%`;
+    }, 150);
+}
+
+function showProcessingState() {
+    const uploadProgress = document.getElementById('upload-progress');
+    const processingState = document.getElementById('processing-state');
+
+    uploadProgress.classList.add('hidden');
+    processingState.classList.remove('hidden');
 }
 
 function hideUploadProgress() {
-    document.getElementById('upload-area').classList.remove('hidden');
-    document.getElementById('upload-progress').classList.add('hidden');
-    document.getElementById('upload-progress-bar').style.width = '0%';
+    const uploadArea = document.getElementById('upload-area');
+    const uploadProgress = document.getElementById('upload-progress');
+    const processingState = document.getElementById('processing-state');
+    const progressBar = document.getElementById('upload-progress-bar');
+    const statusText = document.getElementById('upload-status');
+    const percentageText = document.getElementById('upload-percentage');
+
+    uploadArea.classList.remove('hidden');
+    uploadProgress.classList.add('hidden');
+    processingState.classList.add('hidden');
+
+    if (progressBar) progressBar.style.width = '0%';
+    if (statusText) statusText.textContent = 'Preparing upload...';
+    if (percentageText) percentageText.textContent = '0%';
 }
 
 function showFileInfo(fileInfo) {
@@ -238,32 +728,95 @@ function populateSheetSelectors(sheetNames, detectedSheets = null) {
     masterSelect.innerHTML = '<option value="">Select sheet...</option>';
     statusSelect.innerHTML = '<option value="">Select sheet...</option>';
 
-    // Add sheet options
+    // Log sheet detection results
+    if (detectedSheets) {
+        addLogEntry('INFO', `Analyzing ${sheetNames.length} sheets for auto-detection...`);
+
+        if (detectedSheets.masterbom) {
+            const confidence = Math.round((detectedSheets.confidence?.masterbom || 0) * 100);
+            addLogEntry('SUCCESS', `MasterBOM sheet detected: "${detectedSheets.masterbom}" (${confidence}% confidence)`);
+        } else {
+            addLogEntry('WARNING', 'No MasterBOM sheet auto-detected. Manual selection required.');
+        }
+
+        if (detectedSheets.status) {
+            const confidence = Math.round((detectedSheets.confidence?.status || 0) * 100);
+            addLogEntry('SUCCESS', `Status sheet detected: "${detectedSheets.status}" (${confidence}% confidence)`);
+        } else {
+            addLogEntry('WARNING', 'No Status sheet auto-detected. Manual selection required.');
+        }
+    }
+
+    // Add sheet options with enhanced styling for detected sheets
     sheetNames.forEach(sheet => {
-        const option1 = new Option(sheet, sheet);
-        const option2 = new Option(sheet, sheet);
-        masterSelect.add(option1);
-        statusSelect.add(option2);
+        const isMasterBomDetected = detectedSheets?.masterbom === sheet;
+        const isStatusDetected = detectedSheets?.status === sheet;
+
+        // Create options with special styling for detected sheets
+        const masterOption = new Option(sheet, sheet);
+        const statusOption = new Option(sheet, sheet);
+
+        // Add visual indicators for auto-detected sheets
+        if (isMasterBomDetected) {
+            const confidence = Math.round((detectedSheets.confidence?.masterbom || 0) * 100);
+            masterOption.text = `${sheet} ✨ (Auto-detected - ${confidence}%)`;
+            masterOption.style.fontWeight = 'bold';
+            masterOption.style.color = confidence >= 70 ? '#059669' : '#d97706';
+        }
+
+        if (isStatusDetected) {
+            const confidence = Math.round((detectedSheets.confidence?.status || 0) * 100);
+            statusOption.text = `${sheet} ✨ (Auto-detected - ${confidence}%)`;
+            statusOption.style.fontWeight = 'bold';
+            statusOption.style.color = confidence >= 70 ? '#059669' : '#d97706';
+        }
+
+        masterSelect.add(masterOption);
+        statusSelect.add(statusOption);
     });
 
-    // Handle auto-detection
+    // Handle auto-detection and auto-selection
     if (detectedSheets) {
         showAutoDetectionResults(detectedSheets);
 
-        // Auto-select detected sheets if confidence is high
-        if (detectedSheets.masterbom && detectedSheets.confidence?.masterbom >= 0.7) {
+        // Auto-select detected sheets based on confidence thresholds
+        let autoSelectedCount = 0;
+
+        if (detectedSheets.masterbom && detectedSheets.confidence?.masterbom >= 0.5) {
             masterSelect.value = detectedSheets.masterbom;
-        }
-        if (detectedSheets.status && detectedSheets.confidence?.status >= 0.7) {
-            statusSelect.value = detectedSheets.status;
+            autoSelectedCount++;
+            addLogEntry('INFO', `Auto-selected MasterBOM sheet: "${detectedSheets.masterbom}"`);
         }
 
-        // Check if both sheets are auto-selected
+        if (detectedSheets.status && detectedSheets.confidence?.status >= 0.5) {
+            statusSelect.value = detectedSheets.status;
+            autoSelectedCount++;
+            addLogEntry('INFO', `Auto-selected Status sheet: "${detectedSheets.status}"`);
+        }
+
+        // Update progress based on auto-selection success
+        if (autoSelectedCount === 2) {
+            updateStepProgress(2, 80, 'current');
+            addLogEntry('SUCCESS', 'Both sheets auto-selected successfully! Review and proceed or modify if needed.');
+            showToast('Sheets auto-detected and selected!', 'success');
+        } else if (autoSelectedCount === 1) {
+            updateStepProgress(2, 40, 'current');
+            addLogEntry('INFO', 'One sheet auto-selected. Please select the remaining sheet manually.');
+            showToast('One sheet auto-detected. Please select the other manually.', 'info');
+        } else {
+            updateStepProgress(2, 20, 'current');
+            addLogEntry('INFO', 'No sheets auto-selected. Please make manual selections.');
+            showToast('Please select sheets manually.', 'info');
+        }
+
+        // Check if both sheets are selected (auto or manual)
         checkSheetSelection();
     }
 
-    // Show sheet selection section
-    document.getElementById('sheet-selection').classList.remove('hidden');
+    // Show sheet selection section with animation
+    const sheetSection = document.getElementById('sheet-selection');
+    sheetSection.classList.remove('hidden');
+    sheetSection.classList.add('fade-in');
 }
 
 function showAutoDetectionResults(detectedSheets) {
@@ -272,153 +825,293 @@ function showAutoDetectionResults(detectedSheets) {
     if (!infoPanel) {
         infoPanel = document.createElement('div');
         infoPanel.id = 'auto-detection-info';
-        infoPanel.className = 'bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4';
+        infoPanel.className = 'bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-6 shadow-sm';
 
         const sheetSelection = document.getElementById('sheet-selection');
-        sheetSelection.insertBefore(infoPanel, sheetSelection.firstChild);
+        const title = sheetSelection.querySelector('h2');
+        title.parentNode.insertBefore(infoPanel, title.nextSibling);
+    }
+
+    // Determine overall detection status
+    const masterDetected = detectedSheets.masterbom && detectedSheets.confidence?.masterbom >= 0.5;
+    const statusDetected = detectedSheets.status && detectedSheets.confidence?.status >= 0.5;
+    const bothDetected = masterDetected && statusDetected;
+
+    let headerIcon, headerText, headerColor;
+    if (bothDetected) {
+        headerIcon = 'fas fa-check-circle';
+        headerText = 'Auto-Detection Successful';
+        headerColor = 'text-green-700';
+    } else if (masterDetected || statusDetected) {
+        headerIcon = 'fas fa-exclamation-circle';
+        headerText = 'Partial Auto-Detection';
+        headerColor = 'text-yellow-700';
+    } else {
+        headerIcon = 'fas fa-info-circle';
+        headerText = 'Manual Selection Required';
+        headerColor = 'text-blue-700';
     }
 
     let html = `
         <div class="flex items-start">
             <div class="flex-shrink-0">
-                <i class="fas fa-magic text-blue-600 text-lg"></i>
+                <i class="${headerIcon} ${headerColor} text-xl"></i>
             </div>
             <div class="ml-3 flex-1">
-                <h4 class="text-sm font-medium text-blue-900 mb-2">Auto-Detection Results</h4>
-                <div class="space-y-2">
+                <h4 class="text-sm font-semibold ${headerColor} mb-3">${headerText}</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
     `;
 
-    // Show MasterBOM detection
+    // MasterBOM Detection Card
+    html += '<div class="bg-white rounded-lg p-3 border border-gray-200">';
     if (detectedSheets.masterbom) {
         const confidence = Math.round((detectedSheets.confidence?.masterbom || 0) * 100);
-        const confidenceColor = confidence >= 70 ? 'text-green-600' : confidence >= 50 ? 'text-yellow-600' : 'text-red-600';
+        const confidenceColor = confidence >= 70 ? 'text-green-600' : confidence >= 50 ? 'text-yellow-600' : 'text-orange-600';
+        const confidenceBg = confidence >= 70 ? 'bg-green-100' : confidence >= 50 ? 'bg-yellow-100' : 'bg-orange-100';
+
         html += `
-            <div class="flex items-center justify-between text-sm">
-                <span class="text-gray-700">
-                    <i class="fas fa-cogs mr-1"></i>
-                    MasterBOM Sheet: <strong>${detectedSheets.masterbom}</strong>
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center">
+                    <i class="fas fa-cogs text-blue-600 mr-2"></i>
+                    <span class="font-medium text-gray-900">MasterBOM Sheet</span>
+                </div>
+                <span class="px-2 py-1 rounded-full text-xs font-medium ${confidenceBg} ${confidenceColor}">
+                    ${confidence}%
                 </span>
-                <span class="${confidenceColor} font-medium">${confidence}% confidence</span>
+            </div>
+            <div class="text-sm text-gray-700 font-medium">${detectedSheets.masterbom}</div>
+            <div class="text-xs text-gray-500 mt-1">
+                <i class="fas fa-magic mr-1"></i>Auto-detected and pre-selected
             </div>
         `;
     } else {
         html += `
-            <div class="text-sm text-gray-500">
-                <i class="fas fa-exclamation-triangle mr-1"></i>
-                No MasterBOM sheet detected - please select manually
+            <div class="flex items-center mb-2">
+                <i class="fas fa-cogs text-gray-400 mr-2"></i>
+                <span class="font-medium text-gray-600">MasterBOM Sheet</span>
+            </div>
+            <div class="text-sm text-gray-500">Not detected</div>
+            <div class="text-xs text-gray-400 mt-1">
+                <i class="fas fa-hand-pointer mr-1"></i>Manual selection required
             </div>
         `;
     }
+    html += '</div>';
 
-    // Show Status detection
+    // Status Detection Card
+    html += '<div class="bg-white rounded-lg p-3 border border-gray-200">';
     if (detectedSheets.status) {
         const confidence = Math.round((detectedSheets.confidence?.status || 0) * 100);
-        const confidenceColor = confidence >= 70 ? 'text-green-600' : confidence >= 50 ? 'text-yellow-600' : 'text-red-600';
+        const confidenceColor = confidence >= 70 ? 'text-green-600' : confidence >= 50 ? 'text-yellow-600' : 'text-orange-600';
+        const confidenceBg = confidence >= 70 ? 'bg-green-100' : confidence >= 50 ? 'bg-yellow-100' : 'bg-orange-100';
+
         html += `
-            <div class="flex items-center justify-between text-sm">
-                <span class="text-gray-700">
-                    <i class="fas fa-chart-bar mr-1"></i>
-                    Status Sheet: <strong>${detectedSheets.status}</strong>
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center">
+                    <i class="fas fa-chart-bar text-purple-600 mr-2"></i>
+                    <span class="font-medium text-gray-900">Status Sheet</span>
+                </div>
+                <span class="px-2 py-1 rounded-full text-xs font-medium ${confidenceBg} ${confidenceColor}">
+                    ${confidence}%
                 </span>
-                <span class="${confidenceColor} font-medium">${confidence}% confidence</span>
+            </div>
+            <div class="text-sm text-gray-700 font-medium">${detectedSheets.status}</div>
+            <div class="text-xs text-gray-500 mt-1">
+                <i class="fas fa-magic mr-1"></i>Auto-detected and pre-selected
             </div>
         `;
     } else {
         html += `
-            <div class="text-sm text-gray-500">
-                <i class="fas fa-exclamation-triangle mr-1"></i>
-                No Status sheet detected - please select manually
+            <div class="flex items-center mb-2">
+                <i class="fas fa-chart-bar text-gray-400 mr-2"></i>
+                <span class="font-medium text-gray-600">Status Sheet</span>
+            </div>
+            <div class="text-sm text-gray-500">Not detected</div>
+            <div class="text-xs text-gray-400 mt-1">
+                <i class="fas fa-hand-pointer mr-1"></i>Manual selection required
             </div>
         `;
     }
+    html += '</div>';
 
     html += `
                 </div>
-                <div class="mt-3 text-xs text-blue-700">
-                    <i class="fas fa-info-circle mr-1"></i>
-                    Auto-detected sheets are pre-selected. You can change them if needed.
+                <div class="mt-4 p-3 bg-blue-100 rounded-lg">
+                    <div class="flex items-start">
+                        <i class="fas fa-lightbulb text-blue-600 mt-0.5 mr-2"></i>
+                        <div class="text-xs text-blue-800">
+                            <strong>Tip:</strong> Auto-detected sheets are pre-selected in the dropdowns below.
+                            You can change the selections if the detection is incorrect.
+                            ${bothDetected ? 'Both sheets detected - you can proceed directly!' : 'Please review and complete your selections.'}
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     `;
 
     infoPanel.innerHTML = html;
+
+    // Add animation
+    infoPanel.style.opacity = '0';
+    infoPanel.style.transform = 'translateY(-10px)';
+    setTimeout(() => {
+        infoPanel.style.transition = 'all 0.3s ease-out';
+        infoPanel.style.opacity = '1';
+        infoPanel.style.transform = 'translateY(0)';
+    }, 100);
 }
 
 function checkSheetSelection() {
     const masterSheet = document.getElementById('master-sheet').value;
     const statusSheet = document.getElementById('status-sheet').value;
     const previewBtn = document.getElementById('preview-btn');
-    
+
+    // Check for valid selection
     if (masterSheet && statusSheet && masterSheet !== statusSheet) {
         previewBtn.disabled = false;
-        enableStep(2);
+        updateStepProgress(2, 80, 'current');
+
+        // Check if user overrode auto-detection
+        const detectedSheets = window.lastDetectedSheets;
+        if (detectedSheets) {
+            const masterOverridden = detectedSheets.masterbom && detectedSheets.masterbom !== masterSheet;
+            const statusOverridden = detectedSheets.status && detectedSheets.status !== statusSheet;
+
+            if (masterOverridden || statusOverridden) {
+                let overrideMsg = 'User override detected: ';
+                if (masterOverridden) overrideMsg += `MasterBOM changed from "${detectedSheets.masterbom}" to "${masterSheet}"`;
+                if (masterOverridden && statusOverridden) overrideMsg += ', ';
+                if (statusOverridden) overrideMsg += `Status changed from "${detectedSheets.status}" to "${statusSheet}"`;
+
+                addLogEntry('INFO', overrideMsg);
+                showToast('Sheet selection updated', 'info');
+            }
+        }
+
+        addLogEntry('SUCCESS', `Final selection: MasterBOM="${masterSheet}", Status="${statusSheet}"`);
+
+        // Update preview button text to show readiness
+        previewBtn.innerHTML = '<i class="fas fa-eye mr-2"></i>Preview Selected Sheets';
+        previewBtn.classList.remove('bg-gray-400');
+        previewBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+
+        // Show selection status indicator
+        showSelectionStatus(true);
+
+    } else if (masterSheet && statusSheet && masterSheet === statusSheet) {
+        previewBtn.disabled = true;
+        updateStepProgress(2, 30, 'current');
+        addLogEntry('WARNING', 'Same sheet selected for both MasterBOM and Status - please choose different sheets');
+
+        previewBtn.innerHTML = '<i class="fas fa-exclamation-triangle mr-2"></i>Select Different Sheets';
+        previewBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+        previewBtn.classList.add('bg-gray-400');
+
     } else {
         previewBtn.disabled = true;
+        updateStepProgress(2, 20, 'current');
+
+        if (!masterSheet && !statusSheet) {
+            addLogEntry('INFO', 'Please select both MasterBOM and Status sheets');
+        } else if (!masterSheet) {
+            addLogEntry('INFO', 'Please select a MasterBOM sheet');
+        } else if (!statusSheet) {
+            addLogEntry('INFO', 'Please select a Status sheet');
+        }
+
+        previewBtn.innerHTML = '<i class="fas fa-eye mr-2"></i>Preview Sheets';
+        previewBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+        previewBtn.classList.add('bg-gray-400');
+
+        // Hide selection status indicator
+        showSelectionStatus(false);
+    }
+
+    // Update selection indicators
+    updateSelectionIndicators(masterSheet, statusSheet);
+}
+
+function showSelectionStatus(show) {
+    const statusElement = document.getElementById('selection-status');
+    if (!statusElement) return;
+
+    if (show) {
+        statusElement.classList.remove('hidden');
+        statusElement.classList.add('selection-status');
+    } else {
+        statusElement.classList.add('hidden');
+        statusElement.classList.remove('selection-status');
+    }
+}
+
+function updateSelectionIndicators(masterSheet, statusSheet) {
+    const masterSelect = document.getElementById('master-sheet');
+    const statusSelect = document.getElementById('status-sheet');
+
+    // Add visual feedback to the select elements
+    if (masterSheet) {
+        masterSelect.classList.remove('border-gray-300');
+        masterSelect.classList.add('border-green-400', 'bg-green-50');
+    } else {
+        masterSelect.classList.remove('border-green-400', 'bg-green-50');
+        masterSelect.classList.add('border-gray-300');
+    }
+
+    if (statusSheet) {
+        statusSelect.classList.remove('border-gray-300');
+        statusSelect.classList.add('border-green-400', 'bg-green-50');
+    } else {
+        statusSelect.classList.remove('border-green-400', 'bg-green-50');
+        statusSelect.classList.add('border-gray-300');
     }
 }
 
 function previewSheets() {
     const masterSheet = document.getElementById('master-sheet').value;
     const statusSheet = document.getElementById('status-sheet').value;
-    
+
     if (!masterSheet || !statusSheet) {
+        addLogEntry('ERROR', 'Both MasterBOM and Status sheets must be selected');
         showToast('Please select both sheets', 'error');
         return;
     }
-    
+
     if (masterSheet === statusSheet) {
+        addLogEntry('ERROR', 'MasterBOM and Status must be different sheets');
         showToast('Please select different sheets', 'error');
         return;
     }
-    
+
+    addLogEntry('INFO', 'Navigating to sheet preview and data profiling...');
+    updateStepProgress(2, 100, 'completed');
+
+    // Show loading state
+    showLoading('Loading sheet preview...');
+
     // Navigate to profile page with both sheets
     window.location.href = `/profile?file_id=${currentFileId}&master_sheet=${encodeURIComponent(masterSheet)}&status_sheet=${encodeURIComponent(statusSheet)}`;
 }
 
 // Step Management Functions
 function enableStep(stepNumber) {
-    const stepElement = document.getElementById(`step-${stepNumber}`);
-    const prevStepElement = document.getElementById(`step-${stepNumber - 1}`);
-    
-    if (stepElement) {
-        stepElement.classList.remove('bg-gray-300', 'text-gray-600');
-        stepElement.classList.add('bg-blue-600', 'text-white');
-        
-        // Update text colors
-        const stepContainer = stepElement.parentElement.parentElement;
-        const title = stepContainer.querySelector('h3');
-        const subtitle = stepContainer.querySelector('p');
-        
-        if (title) {
-            title.classList.remove('text-gray-500');
-            title.classList.add('text-gray-900');
-        }
-        if (subtitle) {
-            subtitle.classList.remove('text-gray-400');
-            subtitle.classList.add('text-gray-500');
-        }
-    }
-    
     // Mark previous step as completed
-    if (prevStepElement && stepNumber > 1) {
-        prevStepElement.classList.remove('bg-blue-600');
-        prevStepElement.classList.add('bg-green-600');
-        prevStepElement.innerHTML = '<i class="fas fa-check"></i>';
-    }
-    
-    // Update progress bar
     if (stepNumber > 1) {
-        const progressBar = document.getElementById(`progress-${stepNumber - 1}-${stepNumber}`);
-        if (progressBar) {
-            progressBar.style.width = '100%';
-        }
+        updateStepProgress(stepNumber - 1, 100, 'completed');
     }
-    
+
+    // Set current step as active
+    updateStepProgress(stepNumber, 0, 'current');
+
     currentStep = stepNumber;
 
     // Show/hide sections based on step
     showStepSection(stepNumber);
+
+    // Add log entry for step transition
+    if (STEPS[stepNumber]) {
+        addLogEntry('INFO', `Starting ${STEPS[stepNumber].name}: ${STEPS[stepNumber].description}`);
+    }
 }
 
 function showStepSection(stepNumber) {
@@ -529,42 +1222,77 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Toast Notification System
+// Enhanced Toast Notification System
 function showToast(message, type = 'info', duration = 5000) {
     const container = document.getElementById('toast-container') || createToastContainer();
-    
+
     const toast = document.createElement('div');
-    toast.className = `toast ${type} show`;
-    
+    toast.className = `toast ${type}`;
+
     const icon = {
         'success': 'fas fa-check-circle',
         'error': 'fas fa-exclamation-circle',
         'warning': 'fas fa-exclamation-triangle',
         'info': 'fas fa-info-circle'
     }[type] || 'fas fa-info-circle';
-    
+
+    const bgColor = {
+        'success': 'bg-green-50 border-green-400 text-green-800',
+        'error': 'bg-red-50 border-red-400 text-red-800',
+        'warning': 'bg-yellow-50 border-yellow-400 text-yellow-800',
+        'info': 'bg-blue-50 border-blue-400 text-blue-800'
+    }[type] || 'bg-blue-50 border-blue-400 text-blue-800';
+
+    toast.className = `fixed top-4 right-4 p-4 rounded-lg shadow-xl z-50 transform transition-all duration-300 border-l-4 ${bgColor}`;
+
     toast.innerHTML = `
         <div class="flex items-center">
-            <i class="${icon} mr-2"></i>
-            <span>${escapeHtml(message)}</span>
-            <button class="ml-4 text-white hover:text-gray-200" onclick="this.parentElement.parentElement.remove()">
-                <i class="fas fa-times"></i>
-            </button>
+            <div class="flex-shrink-0">
+                <i class="${icon} text-lg"></i>
+            </div>
+            <div class="ml-3 flex-1">
+                <p class="text-sm font-medium">${escapeHtml(message)}</p>
+            </div>
+            <div class="ml-4">
+                <button class="text-gray-400 hover:text-gray-600 transition-colors" onclick="removeToast(this.closest('.toast'))">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
         </div>
     `;
-    
+
+    // Initial state for animation
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(100%)';
+
     container.appendChild(toast);
-    
+
+    // Trigger animation
+    setTimeout(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(0)';
+    }, 10);
+
     // Auto-remove after duration
     setTimeout(() => {
-        toast.classList.remove('show');
-        toast.classList.add('hide');
-        setTimeout(() => {
-            if (toast.parentElement) {
-                toast.remove();
-            }
-        }, 300);
+        removeToast(toast);
     }, duration);
+
+    // Also add to log panel
+    addLogEntry(type.toUpperCase(), message);
+}
+
+function removeToast(toast) {
+    if (!toast || !toast.parentElement) return;
+
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(100%)';
+
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 300);
 }
 
 function createToastContainer() {
@@ -843,6 +1571,154 @@ function completeProgress() {
     }
 }
 
+// Enhanced Progress Monitoring for Results Page
+let progressPollingInterval = null;
+
+function initializeDetailedProgress() {
+    const progressSteps = document.getElementById('progress-steps');
+    if (!progressSteps) return;
+
+    // Start polling for progress updates
+    startProgressPolling();
+}
+
+function startProgressPolling() {
+    if (progressPollingInterval) {
+        clearInterval(progressPollingInterval);
+    }
+
+    progressPollingInterval = setInterval(async () => {
+        try {
+            const response = await fetch('/api/progress/status');
+            const progressData = await response.json();
+
+            if (progressData && progressData.status) {
+                updateDetailedProgressDisplay(progressData);
+            }
+        } catch (error) {
+            console.error('Error polling progress:', error);
+        }
+    }, 1000); // Poll every second
+}
+
+function updateDetailedProgressDisplay(progressData) {
+    const { status, operation, description, progress, last_activity } = progressData;
+
+    // Update step based on current operation
+    if (operation.includes('MasterBOM')) {
+        updateStepStatus('masterbom', progress, description, 'in-progress');
+    } else if (operation.includes('Status')) {
+        updateStepStatus('masterbom', 100, 'MasterBOM processing complete', 'completed');
+        updateStepStatus('status', progress, description, 'in-progress');
+    } else if (operation.includes('Date')) {
+        updateStepStatus('masterbom', 100, 'MasterBOM processing complete', 'completed');
+        updateStepStatus('status', 100, 'Status sheet processing complete', 'completed');
+        updateStepStatus('dates', progress, description, 'in-progress');
+    } else if (operation.includes('File') || operation.includes('Complete')) {
+        updateStepStatus('masterbom', 100, 'MasterBOM processing complete', 'completed');
+        updateStepStatus('status', 100, 'Status sheet processing complete', 'completed');
+        updateStepStatus('dates', 100, 'Date dimension creation complete', 'completed');
+        updateStepStatus('files', progress, description, progress >= 100 ? 'completed' : 'in-progress');
+
+        if (progress >= 100) {
+            stopProgressPolling();
+        }
+    }
+}
+
+function updateStepStatus(stepId, progress, statusText, state) {
+    const stepElement = document.getElementById(`step-${stepId}`);
+    const iconElement = document.getElementById(`${stepId}-icon`);
+    const statusElement = document.getElementById(`${stepId}-status`);
+    const progressElement = document.getElementById(`${stepId}-progress`);
+    const barElement = document.getElementById(`${stepId}-bar`);
+
+    if (!stepElement) return;
+
+    // Update status text
+    if (statusElement) {
+        statusElement.textContent = statusText;
+    }
+
+    // Update progress percentage
+    if (progressElement) {
+        progressElement.textContent = `${Math.round(progress)}%`;
+    }
+
+    // Update progress bar
+    if (barElement) {
+        barElement.style.width = `${progress}%`;
+    }
+
+    // Update visual state
+    if (state === 'completed') {
+        stepElement.classList.remove('border-gray-300');
+        stepElement.classList.add('border-green-400', 'bg-green-50');
+
+        if (iconElement) {
+            iconElement.innerHTML = '<i class="fas fa-check text-green-600 text-sm"></i>';
+            iconElement.classList.remove('bg-gray-300');
+            iconElement.classList.add('bg-green-500');
+        }
+    } else if (state === 'in-progress') {
+        stepElement.classList.remove('border-gray-300');
+        stepElement.classList.add('border-blue-400', 'bg-blue-50');
+
+        if (iconElement) {
+            iconElement.innerHTML = '<i class="fas fa-spinner fa-spin text-blue-600 text-sm"></i>';
+            iconElement.classList.remove('bg-gray-300');
+            iconElement.classList.add('bg-blue-500');
+        }
+    }
+}
+
+function stopProgressPolling() {
+    if (progressPollingInterval) {
+        clearInterval(progressPollingInterval);
+        progressPollingInterval = null;
+    }
+}
+
+// Download Functions for Organized Files
+function downloadPowerBIPackage() {
+    const fileId = getCurrentFileId();
+    if (!fileId) {
+        showToast('No file ID available for download', 'error');
+        return;
+    }
+
+    window.location.href = `/download/powerbi/${fileId}`;
+    showToast('Downloading Power BI package...', 'success');
+}
+
+function downloadCSVPackage() {
+    const fileId = getCurrentFileId();
+    if (!fileId) {
+        showToast('No file ID available for download', 'error');
+        return;
+    }
+
+    window.location.href = `/download/csv/${fileId}`;
+    showToast('Downloading CSV package...', 'success');
+}
+
+function downloadDAXMeasures() {
+    const fileId = getCurrentFileId();
+    if (!fileId) {
+        showToast('No file ID available for download', 'error');
+        return;
+    }
+
+    window.location.href = `/download/dax/${fileId}`;
+    showToast('Downloading DAX measures file...', 'success');
+}
+
+function getCurrentFileId() {
+    // Extract file ID from URL parameters or global variable
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('file_id') || window.currentFileId;
+}
+
 // Export functions for use in templates
 window.ETLDashboard = {
     showToast,
@@ -854,5 +1730,9 @@ window.ETLDashboard = {
     resetSteps,
     runTransform,
     showProgressModal,
-    hideProgressModal
+    hideProgressModal,
+    initializeDetailedProgress,
+    downloadPowerBIPackage,
+    downloadCSVPackage,
+    downloadDAXMeasures
 };

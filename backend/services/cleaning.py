@@ -41,97 +41,64 @@ def clean_id(s: str) -> str:
 
 def parse_date_column(series: pd.Series, col_name: str) -> pd.DataFrame:
     """
-    Parse a date column and create derived date features.
-    
-    Args:
-        series: Pandas series with date values
-        col_name: Name of the column
-        
-    Returns:
-        DataFrame with original and derived date columns
+    Parse a date-like series -> datetime64[ns] and derive features.
     """
-    result_df = pd.DataFrame()
-    
-    # Original column
-    result_df[col_name] = series
-    
-    try:
-        # Parse dates
-        parsed_dates = pd.to_datetime(series, errors='coerce', infer_datetime_format=True)
-        
-        # Base date column
-        date_col = f"{col_name}_date"
-        result_df[date_col] = parsed_dates.dt.date
-        
-        # Derived columns
-        result_df[f"{col_name}_year"] = parsed_dates.dt.year
-        result_df[f"{col_name}_month"] = parsed_dates.dt.month
-        result_df[f"{col_name}_day"] = parsed_dates.dt.day
-        result_df[f"{col_name}_qtr"] = parsed_dates.dt.quarter
-        result_df[f"{col_name}_week"] = parsed_dates.dt.isocalendar().week
-        
-        logger.info(f"Parsed date column '{col_name}'",
-                   valid_dates=int(parsed_dates.notna().sum()),
-                   total_values=len(series))
-        
-    except Exception as e:
-        logger.error(f"Failed to parse date column '{col_name}': {e}")
-        # Fill with None if parsing fails
-        for suffix in ['_date', '_year', '_month', '_day', '_qtr', '_week']:
-            result_df[f"{col_name}{suffix}"] = None
-    
-    return result_df
+    out = pd.DataFrame()
+    out[col_name] = series
+
+    parsed = pd.to_datetime(series, errors='coerce')              # <— robust parse
+    norm = parsed.dt.normalize()                                  # 00:00:00
+
+    base = f"{col_name}_date"
+    out[base] = norm                                              # datetime64[ns]
+    out[f"{col_name}_year"]  = norm.dt.year
+    out[f"{col_name}_month"] = norm.dt.month
+    out[f"{col_name}_day"]   = norm.dt.day
+    out[f"{col_name}_qtr"]   = norm.dt.quarter
+    out[f"{col_name}_week"]  = norm.dt.isocalendar().week
+
+    return out
 
 
-def create_dim_dates(date_columns: List[pd.Series], 
-                    column_names: List[str]) -> pd.DataFrame:
+def create_dim_dates(date_columns: List[pd.Series],
+                     column_names: List[str],
+                     fy_end_month: int = 12) -> Tuple[pd.DataFrame, pd.DataFrame]:
     """
-    Create a date dimension table from multiple date columns.
-    
-    Args:
-        date_columns: List of date series
-        column_names: Names of the date columns
-        
-    Returns:
-        Date dimension DataFrame
+    Build a contiguous daily calendar (dim_dates) and a role bridge (date_role_bridge).
     """
-    all_dates = []
-    
-    for series, col_name in zip(date_columns, column_names):
-        try:
-            parsed_dates = pd.to_datetime(series, errors='coerce')
-            valid_dates = parsed_dates.dropna()
-            
-            for date_val in valid_dates:
-                all_dates.append({
-                    'date': date_val.date(),
-                    'role': col_name,
-                    'year': date_val.year,
-                    'month': date_val.month,
-                    'day': date_val.day,
-                    'quarter': date_val.quarter,
-                    'week': date_val.isocalendar().week,
-                    'weekday': date_val.weekday(),
-                    'month_name': date_val.strftime('%B'),
-                    'day_name': date_val.strftime('%A')
-                })
-        except Exception as e:
-            logger.warning(f"Failed to process date column '{col_name}': {e}")
-    
-    if not all_dates:
-        logger.warning("No valid dates found for dimension table")
-        return pd.DataFrame()
-    
-    dim_dates = pd.DataFrame(all_dates)
-    
-    # Remove duplicates but keep role information
-    dim_dates = dim_dates.drop_duplicates(subset=['date', 'role'])
-    
-    logger.info(f"Created date dimension", 
-               total_dates=len(dim_dates),
-               date_range=f"{dim_dates['date'].min()} to {dim_dates['date'].max()}")
-    
-    return dim_dates
+    all_valid = []
+    bridge_records = []
+
+    for s, role in zip(date_columns, column_names):
+        parsed = pd.to_datetime(s, errors='coerce').dropna().dt.normalize()
+        if not parsed.empty:
+            all_valid.append(parsed)
+            # Bridge (unique dates per role)
+            bridge_records.append(pd.DataFrame({
+                'Date': parsed.unique(),
+                'Role': role
+            }))
+
+    if not all_valid:
+        return pd.DataFrame(), pd.DataFrame()
+
+    min_d = min(x.min() for x in all_valid)
+    max_d = max(x.max() for x in all_valid)
+
+    # CONTIGUOUS daily calendar
+    rng = pd.date_range(min_d, max_d, freq='D')
+    dim_dates = pd.DataFrame({'Date': rng})
+    dim_dates['Year']  = dim_dates['Date'].dt.year
+    dim_dates['Month'] = dim_dates['Date'].dt.month
+    dim_dates['MonthName'] = dim_dates['Date'].dt.strftime('%b')
+    dim_dates['MonthYear'] = dim_dates['Date'].dt.strftime('%b %Y')
+    dim_dates['MonthYearSort'] = dim_dates['Year'] * 12 + dim_dates['Month']
+    dim_dates['Quarter'] = 'Q' + dim_dates['Date'].dt.quarter.astype(str)
+    dim_dates['Week']    = dim_dates['Date'].dt.isocalendar().week.astype(int)
+
+    date_role_bridge = pd.concat(bridge_records, ignore_index=True).drop_duplicates()
+
+    return dim_dates, date_role_bridge
 
 
 def standardize_text(series: pd.Series) -> pd.Series:
@@ -214,45 +181,73 @@ def create_row_hash(df: pd.DataFrame, columns: Optional[List[str]] = None) -> pd
     return df.apply(hash_row, axis=1)
 
 
-def remove_duplicate_rows(df: pd.DataFrame, 
+def flag_duplicate_rows(df: pd.DataFrame,
+                       subset: Optional[List[str]] = None) -> Tuple[pd.DataFrame, int]:
+    """
+    Flag duplicate rows instead of removing them and return DataFrame with duplicate flag.
+
+    Args:
+        df: DataFrame to process
+        subset: Columns to consider for duplicates (default: all)
+
+    Returns:
+        Tuple of (df_with_flag, duplicate_count)
+    """
+    original_count = len(df)
+
+    # Add duplicate flag column
+    df_with_flag = df.copy()
+    df_with_flag['is_duplicate_entry'] = df.duplicated(subset=subset, keep='first')
+
+    duplicate_count = int(df_with_flag['is_duplicate_entry'].sum())
+
+    if duplicate_count > 0:
+        logger.info(f"Flagged {duplicate_count} duplicate rows (preserved in dataset)",
+                   original_rows=original_count,
+                   flagged_duplicates=duplicate_count)
+
+    return df_with_flag, duplicate_count
+
+
+def remove_duplicate_rows(df: pd.DataFrame,
                          subset: Optional[List[str]] = None) -> Tuple[pd.DataFrame, int]:
     """
     Remove duplicate rows and return cleaned DataFrame with count.
-    
+
     Args:
         df: DataFrame to deduplicate
         subset: Columns to consider for duplicates (default: all)
-        
+
     Returns:
         Tuple of (cleaned_df, duplicate_count)
     """
     original_count = len(df)
-    
+
     # Remove duplicates, keeping first occurrence
     cleaned_df = df.drop_duplicates(subset=subset, keep='first')
-    
+
     duplicate_count = original_count - len(cleaned_df)
-    
+
     if duplicate_count > 0:
         logger.info(f"Removed {duplicate_count} duplicate rows",
                    original_rows=original_count,
                    final_rows=len(cleaned_df))
-    
+
     return cleaned_df, duplicate_count
 
 
 def detect_date_columns(df: pd.DataFrame) -> List[str]:
     """
     Auto-detect date columns based on column names and content.
-    
+
     Args:
         df: DataFrame to analyze
-        
+
     Returns:
         List of column names that appear to contain dates
     """
     date_columns = []
-    
+
     # Common date column name patterns
     date_patterns = [
         r'date',
@@ -265,13 +260,29 @@ def detect_date_columns(df: pd.DataFrame) -> List[str]:
         r'sop',
         r'milestone'
     ]
-    
+
+    # Patterns to exclude (part numbers, IDs, etc.)
+    exclude_patterns = [
+        r'supplier.*pn',
+        r'original.*supplier.*pn',
+        r'part.*number',
+        r'pn$',
+        r'id$',
+        r'code$',
+        r'number$'
+    ]
+
     for col in df.columns:
         col_lower = str(col).lower()
-        
+
+        # Skip columns that match exclusion patterns
+        is_excluded = any(re.search(pattern, col_lower) for pattern in exclude_patterns)
+        if is_excluded:
+            continue
+
         # Check column name patterns
         is_date_name = any(re.search(pattern, col_lower) for pattern in date_patterns)
-        
+
         if is_date_name:
             # Verify content looks like dates
             sample = df[col].dropna().head(10)
@@ -279,12 +290,12 @@ def detect_date_columns(df: pd.DataFrame) -> List[str]:
                 try:
                     parsed = pd.to_datetime(sample, errors='coerce')
                     valid_ratio = parsed.notna().sum() / len(sample)
-                    
+
                     if valid_ratio > 0.5:  # At least 50% valid dates
                         date_columns.append(col)
                         logger.info(f"Auto-detected date column: '{col}'",
                                    valid_ratio=valid_ratio)
                 except Exception:
                     pass
-    
+
     return date_columns

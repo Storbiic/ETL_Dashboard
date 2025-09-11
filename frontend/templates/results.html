@@ -42,152 +42,7 @@
         </div>
     </div>
 
-    <!-- Interactive Dashboard Preview -->
-    <div class="bg-white rounded-lg shadow p-6 mb-6">
-        <div class="flex items-center justify-between mb-6">
-            <h2 class="text-lg font-semibold text-gray-900">
-                <i class="fas fa-chart-line mr-2 text-blue-600"></i>
-                Interactive Dashboard Preview
-            </h2>
-            <div class="flex space-x-2">
-                <button id="refreshDashboardBtn" class="bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm">
-                    <i class="fas fa-sync mr-1"></i>
-                    Refresh
-                </button>
-                <button id="fullscreenDashboardBtn" class="bg-gray-600 text-white px-3 py-2 rounded-md hover:bg-gray-700 transition-colors text-sm">
-                    <i class="fas fa-expand mr-1"></i>
-                    Fullscreen
-                </button>
-            </div>
-        </div>
 
-        <!-- Dashboard Loading State -->
-        <div id="dashboard-loading" class="flex items-center justify-center py-12">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span class="ml-3 text-gray-600">Loading dashboard data...</span>
-        </div>
-
-        <!-- Dashboard Content -->
-        <div id="dashboard-content" class="hidden">
-            <!-- KPIs Row -->
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <div class="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-4 text-white">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-blue-100 text-sm">Total Parts</p>
-                            <p id="kpi-total-parts" class="text-2xl font-bold">-</p>
-                        </div>
-                        <i class="fas fa-cogs text-blue-200 text-2xl"></i>
-                    </div>
-                </div>
-                <div class="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-4 text-white">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-green-100 text-sm">Active Parts</p>
-                            <p id="kpi-active-parts" class="text-2xl font-bold">-</p>
-                        </div>
-                        <i class="fas fa-check-circle text-green-200 text-2xl"></i>
-                    </div>
-                </div>
-                <div class="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg p-4 text-white">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-yellow-100 text-sm">Discontinued</p>
-                            <p id="kpi-discontinued-parts" class="text-2xl font-bold">-</p>
-                        </div>
-                        <i class="fas fa-exclamation-triangle text-yellow-200 text-2xl"></i>
-                    </div>
-                </div>
-                <div class="bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg p-4 text-white">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-purple-100 text-sm">Suppliers</p>
-                            <p id="kpi-suppliers" class="text-2xl font-bold">-</p>
-                        </div>
-                        <i class="fas fa-building text-purple-200 text-2xl"></i>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Charts Row 1 -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <!-- Status Distribution Donut Chart -->
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <h3 class="text-md font-semibold text-gray-900 mb-4">
-                        <i class="fas fa-chart-pie mr-2 text-blue-600"></i>
-                        Status Distribution
-                    </h3>
-                    <div class="relative h-64">
-                        <canvas id="statusDonutChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Top Suppliers Bar Chart -->
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <h3 class="text-md font-semibold text-gray-900 mb-4">
-                        <i class="fas fa-chart-bar mr-2 text-green-600"></i>
-                        Top Suppliers by Parts Count
-                    </h3>
-                    <div class="relative h-64">
-                        <canvas id="suppliersBarChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Charts Row 2 -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <!-- Project Plants Status -->
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <h3 class="text-md font-semibold text-gray-900 mb-4">
-                        <i class="fas fa-industry mr-2 text-purple-600"></i>
-                        Project Plants Overview
-                    </h3>
-                    <div class="relative h-64">
-                        <canvas id="plantsChart"></canvas>
-                    </div>
-                </div>
-
-                <!-- Quality Metrics -->
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <h3 class="text-md font-semibold text-gray-900 mb-4">
-                        <i class="fas fa-award mr-2 text-orange-600"></i>
-                        Quality Supplier Metrics
-                    </h3>
-                    <div class="space-y-3">
-                        <div class="flex justify-between items-center p-3 bg-white rounded border">
-                            <span class="text-sm font-medium">Morocco Suppliers Priority</span>
-                            <span id="morocco-priority" class="text-green-600 font-bold">-</span>
-                        </div>
-                        <div class="flex justify-between items-center p-3 bg-white rounded border">
-                            <span class="text-sm font-medium">Duplicate Resolution Rate</span>
-                            <span id="duplicate-resolution" class="text-blue-600 font-bold">-</span>
-                        </div>
-                        <div class="flex justify-between items-center p-3 bg-white rounded border">
-                            <span class="text-sm font-medium">Data Quality Score</span>
-                            <span id="data-quality" class="text-purple-600 font-bold">-</span>
-                        </div>
-                        <div class="flex justify-between items-center p-3 bg-white rounded border">
-                            <span class="text-sm font-medium">Processing Efficiency</span>
-                            <span id="processing-efficiency" class="text-orange-600 font-bold">-</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Status Grid -->
-            <div class="bg-gray-50 rounded-lg p-4">
-                <h3 class="text-md font-semibold text-gray-900 mb-4">
-                    <i class="fas fa-table mr-2 text-gray-600"></i>
-                    Project Status Matrix
-                </h3>
-                <div class="overflow-x-auto">
-                    <div id="status-matrix" class="min-w-full">
-                        <!-- Status matrix will be populated dynamically -->
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- Download Artifacts -->
     <div class="bg-white rounded-lg shadow p-6">
@@ -196,80 +51,109 @@
             Download Files
         </h2>
 
-        <!-- File Categories Documentation -->
-        <div class="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Organized Download Options -->
+        <div class="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Power BI Optimized (Parquet) -->
             <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div class="flex items-start">
                     <div class="flex-shrink-0">
-                        <i class="fas fa-cogs text-blue-600 text-lg mt-1"></i>
+                        <i class="fas fa-chart-bar text-blue-600 text-lg mt-1"></i>
                     </div>
                     <div class="ml-3">
-                        <h4 class="text-sm font-semibold text-blue-900 mb-2">Pipeline Output Files</h4>
-                        <p class="text-sm text-blue-800">
-                            Ready-to-use files optimized for business intelligence tools and reporting.
-                            These files include cleaned data with proper relationships, standardized formats,
-                            and are ideal for direct import into analytics platforms.
+                        <h4 class="text-sm font-semibold text-blue-900 mb-2">Power BI Package</h4>
+                        <p class="text-sm text-blue-800 mb-3">
+                            Optimized Parquet files in organized DATA_BI/ folder for direct Power BI import.
                         </p>
+                        <button id="download-powerbi-btn" class="w-full bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm">
+                            <i class="fas fa-download mr-1"></i>
+                            Download DATA_BI.zip
+                        </button>
                         <div class="mt-2 text-xs text-blue-700">
-                            <i class="fas fa-check mr-1"></i> Optimized for BI tools
+                            <i class="fas fa-check mr-1"></i> Parquet format
                             <br>
-                            <i class="fas fa-check mr-1"></i> Standardized formats
+                            <i class="fas fa-check mr-1"></i> Optimized for Power BI
                             <br>
-                            <i class="fas fa-check mr-1"></i> Ready for reporting
+                            <i class="fas fa-check mr-1"></i> Includes DAX measures
                         </div>
                     </div>
                 </div>
             </div>
 
+            <!-- CSV Package -->
             <div class="bg-green-50 border border-green-200 rounded-lg p-4">
                 <div class="flex items-start">
                     <div class="flex-shrink-0">
-                        <i class="fas fa-database text-green-600 text-lg mt-1"></i>
+                        <i class="fas fa-file-csv text-green-600 text-lg mt-1"></i>
                     </div>
                     <div class="ml-3">
-                        <h4 class="text-sm font-semibold text-green-900 mb-2">Processed Files</h4>
-                        <p class="text-sm text-green-800">
-                            Cleaned and transformed raw data files for advanced analysis and custom integrations.
-                            These files contain the complete processed dataset with all transformations applied,
-                            perfect for data scientists and advanced users.
+                        <h4 class="text-sm font-semibold text-green-900 mb-2">CSV Package</h4>
+                        <p class="text-sm text-green-800 mb-3">
+                            CSV files in organized DATA_CSV/ folder for universal compatibility.
                         </p>
+                        <button id="download-csv-btn" class="w-full bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700 transition-colors text-sm">
+                            <i class="fas fa-download mr-1"></i>
+                            Download DATA_CSV.zip
+                        </button>
                         <div class="mt-2 text-xs text-green-700">
-                            <i class="fas fa-check mr-1"></i> Complete datasets
+                            <i class="fas fa-check mr-1"></i> CSV format
                             <br>
-                            <i class="fas fa-check mr-1"></i> Advanced analysis ready
+                            <i class="fas fa-check mr-1"></i> Universal compatibility
                             <br>
-                            <i class="fas fa-check mr-1"></i> Custom integration support
+                            <i class="fas fa-check mr-1"></i> Excel compatible
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DAX Measures -->
+            <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0">
+                        <i class="fas fa-code text-purple-600 text-lg mt-1"></i>
+                    </div>
+                    <div class="ml-3">
+                        <h4 class="text-sm font-semibold text-purple-900 mb-2">DAX Measures</h4>
+                        <p class="text-sm text-purple-800 mb-3">
+                            Ready-to-import DAX measures for Power BI analysis and reporting.
+                        </p>
+                        <button id="download-dax-btn" class="w-full bg-purple-600 text-white px-3 py-2 rounded-md hover:bg-purple-700 transition-colors text-sm">
+                            <i class="fas fa-download mr-1"></i>
+                            Download DAX File
+                        </button>
+                        <div class="mt-2 text-xs text-purple-700">
+                            <i class="fas fa-check mr-1"></i> Duplicate analysis
+                            <br>
+                            <i class="fas fa-check mr-1"></i> Project completion tracking
+                            <br>
+                            <i class="fas fa-check mr-1"></i> Plant performance metrics
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Download Actions -->
-        <div class="mb-4 flex flex-wrap gap-3">
-            <button id="downloadAllBtn" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center">
-                <i class="fas fa-download mr-2"></i>
-                Download All (ZIP)
-            </button>
-            <button id="openPipelineFolderBtn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center">
-                <i class="fas fa-folder-open mr-2"></i>
-                Open Pipeline Folder
-            </button>
-            <button id="openProcessedFolderBtn" class="bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors flex items-center">
-                <i class="fas fa-folder mr-2"></i>
-                Open Processed Folder
-            </button>
-            <button id="refreshFilesBtn" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors flex items-center">
-                <i class="fas fa-sync mr-2"></i>
-                Refresh Files
-            </button>
+        <!-- Individual Files Section -->
+        <div class="mt-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-md font-semibold text-gray-900">
+                    <i class="fas fa-file-alt mr-2 text-gray-600"></i>
+                    Individual Files
+                </h3>
+                <button id="show-individual-btn" class="text-sm text-blue-600 hover:text-blue-800">
+                    <i class="fas fa-eye mr-1"></i>
+                    Show All Files
+                </button>
+            </div>
+            <div id="individual-files-section" class="hidden">
+                <div id="files-list" class="space-y-2">
+                    <!-- Files will be populated dynamically -->
+                </div>
+            </div>
         </div>
 
-        <div id="artifacts-section">
-            <div class="flex items-center justify-center py-8">
-                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <span class="ml-3 text-gray-600">Loading download links...</span>
-            </div>
+        <!-- Artifacts Section (for transform results) -->
+        <div id="artifacts-section" class="hidden mt-6">
+            <!-- Artifacts will be populated dynamically -->
         </div>
     </div>
 
@@ -293,19 +177,7 @@
 
 
 
-        <!-- Pipeline Output Status -->
-        <div id="pipelineSection" class="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-            <h3 class="font-medium text-gray-900 mb-2">
-                <i class="fas fa-cogs mr-2"></i>
-                Automated Pipeline Status
-            </h3>
-            <div id="pipelineStatus">
-                <div class="flex items-center text-gray-600">
-                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
-                    Loading pipeline status...
-                </div>
-            </div>
-        </div>
+        <!-- Pipeline status section removed -->
 
         <div class="grid grid-cols-1 gap-4">
 
@@ -331,23 +203,7 @@ const FASTAPI_URL = '{{ fastapi_url }}';
 // Store transform result for reference
 let transformResult = null;
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize download functionality
-    initializeDownloadFunctionality();
-
-    // Try to get result from sessionStorage first
-    const storedResult = sessionStorage.getItem(`transform_result_${fileId}`);
-    if (storedResult) {
-        transformResult = JSON.parse(storedResult);
-        renderResults();
-    } else {
-        // If no stored result, show message to run transform
-        showNoResultsMessage();
-    }
-
-    // Load available files
-    loadAvailableFiles();
-});
+// Removed duplicate DOMContentLoaded listener
 
 function renderResults() {
     if (!transformResult) return;
@@ -421,7 +277,15 @@ function renderSummary(summary) {
 
 function renderArtifacts(artifacts) {
     const container = document.getElementById('artifacts-section');
-    
+
+    if (!container) {
+        console.warn('artifacts-section element not found');
+        return;
+    }
+
+    // Show the artifacts section
+    container.classList.remove('hidden');
+
     if (!artifacts || artifacts.length === 0) {
         container.innerHTML = '<p class="text-gray-500">No artifacts available</p>';
         return;
@@ -782,5 +646,169 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+function getFormatIcon(format) {
+    const icons = {
+        'CSV': 'csv',
+        'Parquet': 'database',
+        'SQLite': 'database',
+        'Markdown': 'markdown',
+        'processed': 'file',
+        'pipeline_output': 'cog'
+    };
+    return icons[format] || 'file';
+}
+
+function showNoResultsMessage() {
+    const summaryContainer = document.getElementById('summary-content');
+    const artifactsContainer = document.getElementById('artifacts-section');
+    const logContainer = document.getElementById('log-section');
+
+    const message = `
+        <div class="text-center py-8">
+            <i class="fas fa-info-circle text-blue-600 text-3xl mb-4"></i>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">No Transform Results</h3>
+            <p class="text-gray-600 mb-4">Run an ETL transformation to see results here.</p>
+            <a href="/" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                Start New Transform
+            </a>
+        </div>
+    `;
+
+    if (summaryContainer) summaryContainer.innerHTML = message;
+    if (artifactsContainer) artifactsContainer.innerHTML = '';
+    if (logContainer) logContainer.innerHTML = message;
+}
+
+function showToast(message, type = 'info') {
+    // Create toast notification
+    const toast = document.createElement('div');
+    toast.className = `fixed top-4 right-4 z-50 p-4 rounded-md shadow-lg max-w-sm ${
+        type === 'success' ? 'bg-green-600 text-white' :
+        type === 'error' ? 'bg-red-600 text-white' :
+        'bg-blue-600 text-white'
+    }`;
+
+    toast.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas ${
+                type === 'success' ? 'fa-check-circle' :
+                type === 'error' ? 'fa-exclamation-circle' :
+                'fa-info-circle'
+            } mr-2"></i>
+            <span class="text-sm">${message}</span>
+        </div>
+    `;
+
+    document.body.appendChild(toast);
+
+    // Remove toast after 5 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 5000);
+}
+
+function loadResults() {
+    // Try to get result from sessionStorage first
+    const storedResult = sessionStorage.getItem(`transform_result_${fileId}`);
+    if (storedResult) {
+        transformResult = JSON.parse(storedResult);
+        renderResults();
+    } else {
+        // If no stored result, show message to run transform
+        showNoResultsMessage();
+    }
+
+    // Load available files
+    loadAvailableFiles();
+}
+
+function loadAvailableFiles() {
+    // Load available files for individual download
+    fetch('/api/files/list')
+        .then(response => response.json())
+        .then(files => {
+            const filesList = document.getElementById('files-list');
+            if (filesList && files && files.length > 0) {
+                let html = '';
+                files.forEach(file => {
+                    html += `
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded border">
+                            <div class="flex items-center">
+                                <i class="fas fa-file-${getFormatIcon(file.type)} mr-3 text-gray-600"></i>
+                                <div>
+                                    <div class="font-medium text-gray-900">${escapeHtml(file.name)}</div>
+                                    <div class="text-sm text-gray-500">${file.size_human}</div>
+                                </div>
+                            </div>
+                            <a href="${file.download_url}"
+                               class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                                <i class="fas fa-download mr-1"></i>
+                                Download
+                            </a>
+                        </div>
+                    `;
+                });
+                filesList.innerHTML = html;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading files:', error);
+        });
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadResults();
+
+    // Initialize enhanced progress monitoring
+    if (window.ETLDashboard && window.ETLDashboard.initializeDetailedProgress) {
+        window.ETLDashboard.initializeDetailedProgress();
+    }
+
+    // Add event listeners for download buttons
+    const downloadPowerBIBtn = document.getElementById('download-powerbi-btn');
+    const downloadCSVBtn = document.getElementById('download-csv-btn');
+    const downloadDAXBtn = document.getElementById('download-dax-btn');
+    const showIndividualBtn = document.getElementById('show-individual-btn');
+
+    if (downloadPowerBIBtn) {
+        downloadPowerBIBtn.addEventListener('click', function() {
+            window.location.href = `/download/powerbi/${fileId}`;
+            showToast('Downloading Power BI package...', 'success');
+        });
+    }
+
+    if (downloadCSVBtn) {
+        downloadCSVBtn.addEventListener('click', function() {
+            window.location.href = `/download/csv/${fileId}`;
+            showToast('Downloading CSV package...', 'success');
+        });
+    }
+
+    if (downloadDAXBtn) {
+        downloadDAXBtn.addEventListener('click', function() {
+            window.location.href = `/download/dax/${fileId}`;
+            showToast('Downloading DAX measures file...', 'success');
+        });
+    }
+
+    if (showIndividualBtn) {
+        showIndividualBtn.addEventListener('click', function() {
+            const individualSection = document.getElementById('individual-files-section');
+            if (individualSection) {
+                individualSection.classList.toggle('hidden');
+                const icon = this.querySelector('i');
+                if (individualSection.classList.contains('hidden')) {
+                    this.innerHTML = '<i class="fas fa-eye mr-1"></i>Show All Files';
+                } else {
+                    this.innerHTML = '<i class="fas fa-eye-slash mr-1"></i>Hide All Files';
+                }
+            }
+        });
+    }
+});
 </script>
 {% endblock %}

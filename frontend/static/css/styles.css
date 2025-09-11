@@ -281,6 +281,210 @@
     animation: pulse 2s infinite;
 }
 
+/* Enhanced Progress Stepper */
+.step-container {
+    position: relative;
+}
+
+.step-container .step-indicator {
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.step-container.active .step-indicator {
+    @apply bg-blue-600 text-white shadow-lg;
+    transform: scale(1.1);
+}
+
+.step-container.completed .step-indicator {
+    @apply bg-green-600 text-white shadow-lg;
+}
+
+.step-container.completed .step-check {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.step-container.error .step-indicator {
+    @apply bg-red-600 text-white shadow-lg;
+    animation: shake 0.5s ease-in-out;
+}
+
+/* Log Panel Styles */
+#log-panel {
+    backdrop-filter: blur(10px);
+}
+
+#log-panel.open {
+    transform: translateX(0);
+}
+
+#show-log-panel.hidden {
+    transform: translateX(100%);
+}
+
+.log-entry {
+    @apply flex items-start p-3 rounded-lg mb-2 border-l-4 transition-all duration-200;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.log-entry.info {
+    @apply bg-blue-50 text-blue-800 border-blue-400;
+}
+
+.log-entry.warning {
+    @apply bg-yellow-50 text-yellow-800 border-yellow-400;
+}
+
+.log-entry.error {
+    @apply bg-red-50 text-red-800 border-red-400;
+}
+
+.log-entry.success {
+    @apply bg-green-50 text-green-800 border-green-400;
+}
+
+.log-entry.debug {
+    @apply bg-gray-50 text-gray-800 border-gray-400;
+}
+
+.log-entry .log-timestamp {
+    @apply text-xs text-gray-500 font-mono;
+}
+
+.log-entry .log-level {
+    @apply text-xs font-bold uppercase px-2 py-1 rounded;
+}
+
+.log-entry .log-level.info {
+    @apply bg-blue-200 text-blue-800;
+}
+
+.log-entry .log-level.warning {
+    @apply bg-yellow-200 text-yellow-800;
+}
+
+.log-entry .log-level.error {
+    @apply bg-red-200 text-red-800;
+}
+
+.log-entry .log-level.success {
+    @apply bg-green-200 text-green-800;
+}
+
+/* Enhanced Upload Area */
+.upload-area {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.upload-area:hover {
+    @apply border-blue-400 bg-blue-50;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+}
+
+.upload-area.dragover {
+    @apply border-blue-500 bg-blue-100;
+    transform: scale(1.02);
+    box-shadow: 0 15px 35px rgba(59, 130, 246, 0.2);
+}
+
+/* Enhanced Progress Bars */
+.progress-bar-animated {
+    background: linear-gradient(90deg, #3b82f6, #10b981, #3b82f6);
+    background-size: 200% 100%;
+    animation: progressShimmer 2s linear infinite;
+}
+
+@keyframes progressShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Skeleton Loading */
+.skeleton {
+    @apply bg-gray-200 rounded animate-pulse;
+}
+
+.skeleton-text {
+    @apply h-4 bg-gray-200 rounded animate-pulse;
+}
+
+.skeleton-circle {
+    @apply bg-gray-200 rounded-full animate-pulse;
+}
+
+/* Enhanced Animations */
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+@keyframes glow {
+    0%, 100% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.5); }
+    50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.8); }
+}
+
+/* Toast Enhancements */
+.toast {
+    @apply fixed top-4 right-4 p-4 rounded-lg shadow-xl z-50 transform transition-all duration-300 border-l-4;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.toast.success {
+    @apply bg-green-50 text-green-800 border-green-400;
+}
+
+.toast.error {
+    @apply bg-red-50 text-red-800 border-red-400;
+}
+
+.toast.warning {
+    @apply bg-yellow-50 text-yellow-800 border-yellow-400;
+}
+
+.toast.info {
+    @apply bg-blue-50 text-blue-800 border-blue-400;
+}
+
+.toast.hide {
+    animation: slideOutRight 0.3s ease-in forwards;
+}
+
+@keyframes slideOutRight {
+    to {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+}
+
 /* Utility classes */
 .text-truncate {
     @apply truncate;
@@ -300,4 +504,133 @@
 
 .border-hover:hover {
     @apply border-blue-400;
+}
+
+/* Enhanced Sheet Selection */
+.sheet-selector {
+    position: relative;
+}
+
+.sheet-selector select {
+    appearance: none;
+    background-image: none;
+}
+
+.sheet-selector select:focus {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.sheet-selector.auto-detected select {
+    @apply border-green-400 bg-green-50;
+}
+
+.sheet-selector.auto-detected::after {
+    content: "✨";
+    position: absolute;
+    right: 30px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    font-size: 16px;
+}
+
+/* Auto-detection panel animations */
+.auto-detection-panel {
+    animation: slideInDown 0.4s ease-out;
+}
+
+@keyframes slideInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Selection status indicator */
+.selection-status {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Enhanced dropdown options */
+select option[data-auto-detected="true"] {
+    background-color: #f0f9ff;
+    font-weight: 600;
+}
+
+/* Confidence badges */
+.confidence-badge {
+    @apply inline-flex items-center px-2 py-1 rounded-full text-xs font-medium;
+}
+
+.confidence-high {
+    @apply bg-green-100 text-green-800;
+}
+
+.confidence-medium {
+    @apply bg-yellow-100 text-yellow-800;
+}
+
+.confidence-low {
+    @apply bg-orange-100 text-orange-800;
+}
+
+/* Fade in animation for sections */
+.fade-in {
+    animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive Log Panel */
+@media (max-width: 1024px) {
+    #log-panel {
+        @apply w-80;
+    }
+}
+
+@media (max-width: 768px) {
+    #log-panel {
+        @apply w-full;
+    }
+
+    #main-content {
+        @apply mr-0;
+    }
+
+    .step-container {
+        @apply flex-col text-center;
+    }
+
+    .step-container .ml-4 {
+        @apply ml-0 mt-2;
+    }
+
+    /* Mobile sheet selection */
+    .grid-cols-1.md\\:grid-cols-2 {
+        @apply grid-cols-1;
+    }
 }

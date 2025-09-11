@@ -19,7 +19,7 @@ FASTAPI_BASE_URL = f"http://{os.getenv('FASTAPI_HOST', '127.0.0.1')}:{os.getenv(
 # Get the project root directory (parent of frontend directory)
 PROJECT_ROOT = Path(__file__).parent.parent
 PROCESSED_FOLDER = PROJECT_ROOT / os.getenv('PROCESSED_FOLDER', 'data/processed')
-PIPELINE_OUTPUT_FOLDER = PROJECT_ROOT / os.getenv('PIPELINE_OUTPUT_FOLDER', 'data/pipeline_output')
+# Pipeline output folder removed - using processed folder only
 
 
 @app.route('/')
@@ -109,31 +109,7 @@ def get_progress_status():
         return jsonify({"error": f"Failed to fetch progress status: {str(e)}"}), 500
 
 
-@app.route('/api/pipeline/<file_id>/status')
-def get_pipeline_status(file_id):
-    """Get pipeline status for a specific file via API proxy."""
-    try:
-        response = requests.get(f"{FASTAPI_BASE_URL}/api/pipeline/{file_id}/status", timeout=10)
-
-        if response.status_code == 200:
-            return jsonify(response.json())
-        else:
-            return jsonify({
-                "file_id": file_id,
-                "error": f"Backend returned status {response.status_code}",
-                "details": response.text
-            }), response.status_code
-
-    except requests.exceptions.RequestException as e:
-        return jsonify({
-            "file_id": file_id,
-            "error": f"Failed to fetch pipeline status: {str(e)}"
-        }), 500
-    except Exception as e:
-        return jsonify({
-            "file_id": file_id,
-            "error": f"Unexpected error: {str(e)}"
-        }), 500
+# Pipeline status endpoint removed - manual ETL only
 
 
 
@@ -173,10 +149,8 @@ def get_powerbi_templates():
 def download_file(filename):
     """Download processed files."""
     try:
-        # Try pipeline output folder first, then processed folder
-        file_path = PIPELINE_OUTPUT_FOLDER / filename
-        if not file_path.exists():
-            file_path = PROCESSED_FOLDER / filename
+        # Use processed folder only
+        file_path = PROCESSED_FOLDER / filename
 
         if not file_path.exists():
             return jsonify({"error": f"File not found: {filename}"}), 404
@@ -207,17 +181,11 @@ def download_bulk_files(file_id):
         # Find all files related to this processing session
         files_to_zip = []
 
-        # Check pipeline output folder
-        if PIPELINE_OUTPUT_FOLDER.exists():
-            for file_path in PIPELINE_OUTPUT_FOLDER.iterdir():
-                if file_path.is_file():
-                    files_to_zip.append((file_path, f"pipeline_output/{file_path.name}"))
-
-        # Check processed folder
+        # Check processed folder only
         if PROCESSED_FOLDER.exists():
             for file_path in PROCESSED_FOLDER.iterdir():
                 if file_path.is_file():
-                    files_to_zip.append((file_path, f"processed/{file_path.name}"))
+                    files_to_zip.append((file_path, file_path.name))
 
         if not files_to_zip:
             return jsonify({"error": "No files found to download"}), 404
@@ -233,6 +201,126 @@ def download_bulk_files(file_id):
             download_name=zip_filename,
             mimetype='application/zip'
         )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/download/powerbi/<file_id>')
+def download_powerbi_package(file_id):
+    """Download organized Power BI package with Parquet files and DAX measures."""
+    import zipfile
+    import tempfile
+    from datetime import datetime
+    from backend.services.dax_generator import DAXGenerator
+
+    try:
+        # Get Parquet files from processed folder
+        parquet_files = []
+
+        if PROCESSED_FOLDER.exists():
+            for file_path in PROCESSED_FOLDER.iterdir():
+                if file_path.is_file() and file_path.suffix.lower() == '.parquet':
+                    parquet_files.append(file_path)
+
+        if not parquet_files:
+            return jsonify({"error": "No Parquet files found for Power BI package"}), 404
+
+        # Create temporary directory for DAX file
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Generate DAX measures file
+            dax_generator = DAXGenerator()
+            dax_file_path = dax_generator.generate_dax_file(temp_dir)
+
+            # Create temporary ZIP file
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp_file:
+                with zipfile.ZipFile(tmp_file.name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    # Add Parquet files to DATA_BI folder
+                    for file_path in parquet_files:
+                        zipf.write(file_path, f"DATA_BI/{file_path.name}")
+
+                    # Add DAX measures file to DATA_BI folder
+                    zipf.write(dax_file_path, f"DATA_BI/ETL_Dashboard_Measures.dax")
+
+                # Generate download filename with timestamp
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                download_filename = f"DATA_BI_{timestamp}.zip"
+
+                return send_file(
+                    tmp_file.name,
+                    as_attachment=True,
+                    download_name=download_filename,
+                    mimetype='application/zip'
+                )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/download/csv/<file_id>')
+def download_csv_package(file_id):
+    """Download organized CSV package."""
+    import zipfile
+    import tempfile
+    from datetime import datetime
+
+    try:
+        # Get CSV files from processed folder
+        csv_files = []
+
+        if PROCESSED_FOLDER.exists():
+            for file_path in PROCESSED_FOLDER.iterdir():
+                if file_path.is_file() and file_path.suffix.lower() == '.csv':
+                    csv_files.append(file_path)
+
+        if not csv_files:
+            return jsonify({"error": "No CSV files found for CSV package"}), 404
+
+        # Create temporary ZIP file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp_file:
+            with zipfile.ZipFile(tmp_file.name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                # Add CSV files to DATA_CSV folder
+                for file_path in csv_files:
+                    zipf.write(file_path, f"DATA_CSV/{file_path.name}")
+
+            # Generate download filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            download_filename = f"DATA_CSV_{timestamp}.zip"
+
+            return send_file(
+                tmp_file.name,
+                as_attachment=True,
+                download_name=download_filename,
+                mimetype='application/zip'
+            )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/download/dax/<file_id>')
+def download_dax_measures(file_id):
+    """Download DAX measures file."""
+    import tempfile
+    from datetime import datetime
+    from backend.services.dax_generator import DAXGenerator
+
+    try:
+        # Generate DAX measures file
+        with tempfile.TemporaryDirectory() as temp_dir:
+            dax_generator = DAXGenerator()
+            dax_file_path = dax_generator.generate_dax_file(temp_dir)
+
+            # Generate download filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            download_filename = f"ETL_Dashboard_Measures_{timestamp}.dax"
+
+            return send_file(
+                dax_file_path,
+                as_attachment=True,
+                download_name=download_filename,
+                mimetype='text/plain'
+            )
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -284,20 +372,7 @@ def list_available_files():
     try:
         files = []
 
-        # Check pipeline output folder
-        if PIPELINE_OUTPUT_FOLDER.exists():
-            for file_path in PIPELINE_OUTPUT_FOLDER.iterdir():
-                if file_path.is_file():
-                    stat = file_path.stat()
-                    files.append({
-                        "name": file_path.name,
-                        "path": f"pipeline_output/{file_path.name}",
-                        "size_bytes": stat.st_size,
-                        "size_human": format_file_size(stat.st_size),
-                        "modified": stat.st_mtime,
-                        "type": "pipeline_output",
-                        "download_url": f"/download/{file_path.name}"
-                    })
+        # Pipeline output folder removed - using processed folder only
 
         # Check processed folder
         if PROCESSED_FOLDER.exists():
@@ -411,13 +486,25 @@ def api_upload():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
 
-        # Forward the file to FastAPI backend
-        files = {'file': (file.filename, file.stream, file.content_type)}
-        response = requests.post(f"{FASTAPI_BASE_URL}/api/upload", files=files)
+        # Read the file content to avoid stream issues
+        file_content = file.read()
+        file.seek(0)  # Reset stream position
 
-        return jsonify(response.json()), response.status_code
+        # Forward the file to FastAPI backend
+        files = {'file': (file.filename, file_content, file.content_type)}
+        response = requests.post(f"{FASTAPI_BASE_URL}/api/upload", files=files, timeout=30)
+
+        if response.status_code == 200:
+            return jsonify(response.json()), response.status_code
+        else:
+            return jsonify({'error': f'Backend error: {response.text}'}), response.status_code
+
+    except requests.exceptions.Timeout:
+        return jsonify({'error': 'Upload timeout - file may be too large'}), 408
+    except requests.exceptions.RequestException as e:
+        return jsonify({'error': f'Network error: {str(e)}'}), 500
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f'Upload failed: {str(e)}'}), 500
 
 
 @app.route('/api/transform', methods=['POST'])

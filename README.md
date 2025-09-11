@@ -22,29 +22,34 @@ A FastAPI + Flask application for auditable ETL processing of Excel workbooks, p
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd BI_ETL_DASH
+cd ETL_Dashboard
 ```
 
-2. Create virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
+2. Create environment (choose one):
 
-3. Install dependencies:
+**Option A: Conda Environment (Recommended)**
 ```bash
+conda create -n etl_dashboard python=3.11 -y
+conda activate etl_dashboard
 pip install -r requirements.txt
 ```
 
-4. Set up environment:
+**Option B: Virtual Environment**
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+3. Set up environment:
 ```bash
 cp .env.example .env
 # Edit .env with your configuration
 ```
 
-5. Create data directories:
+4. Create data directories:
 ```bash
-mkdir -p data/uploads data/processed
+mkdir -p data/uploads data/processed data/pipeline_output
 ```
 
 ### Running the Application
@@ -56,6 +61,11 @@ python run_dev.py
 This starts both backend and frontend servers with auto-reload enabled.
 
 #### Option 2: Two Separate Processes
+
+**If using conda environment, activate it first:**
+```bash
+conda activate etl_dashboard
+```
 
 Terminal 1 - FastAPI Backend:
 ```bash

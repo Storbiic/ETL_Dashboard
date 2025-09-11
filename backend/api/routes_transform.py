@@ -13,10 +13,10 @@ from backend.core.logging import ETLLogger, logger
 from backend.models.schemas import TransformRequest, TransformResponse, TransformSummary, ArtifactInfo
 from backend.services.excel_reader import ExcelReader
 from backend.services.masterbom_rules import MasterBOMProcessor
-from backend.services.status_rules import StatusProcessor
+from backend.services.status_processor_v2 import StatusProcessorV2
 from backend.services.storage import DataStorage
 from backend.services.cleaning import create_dim_dates, detect_date_columns
-from backend.services.pipeline_service import PipelineService
+# Pipeline service removed - manual ETL only
 
 router = APIRouter()
 
@@ -91,48 +91,83 @@ async def transform_data(request: TransformRequest):
                            status_cols=len(status_df.columns))
             
             # Process MasterBOM sheet
-            etl_logger.info("Processing MasterBOM sheet")
-            
+            etl_logger.info("=== STARTING MASTERBOM PROCESSING ===")
+            etl_logger.info("Processing MasterBOM sheet",
+                          input_rows=len(master_df),
+                          input_cols=len(master_df.columns),
+                          id_col=request.options.id_col,
+                          date_cols=request.options.date_cols)
+
             master_processor = MasterBOMProcessor(master_df, etl_logger)
             master_results = master_processor.process(
                 id_col=request.options.id_col,
                 date_cols=request.options.date_cols
             )
+
+            etl_logger.info("=== MASTERBOM PROCESSING COMPLETE ===",
+                          output_tables=len(master_results),
+                          table_names=list(master_results.keys()))
             
             # Process Status sheet
-            etl_logger.info("Processing Status sheet")
-            
-            status_processor = StatusProcessor(status_df, etl_logger)
-            status_clean = status_processor.process()
+            etl_logger.info("=== STARTING STATUS SHEET PROCESSING ===")
+            etl_logger.info("Processing Status sheet",
+                          input_rows=len(status_df),
+                          input_cols=len(status_df.columns))
+
+            status_processor = StatusProcessorV2(status_df, etl_logger)
+            status_results = status_processor.process()
+            status_clean = status_results['status_clean']
+            project_completion = status_results['project_completion_by_plant']
+
+            etl_logger.info("=== STATUS SHEET PROCESSING COMPLETE ===",
+                          status_clean_rows=len(status_clean),
+                          project_completion_rows=len(project_completion))
             
             # Create date dimension from all date columns
+            etl_logger.info("=== STARTING DATE DIMENSION CREATION ===")
             etl_logger.info("Creating date dimension")
-            
+
             date_columns = []
             date_column_names = []
-            
+
             # Collect date columns from MasterBOM
+            etl_logger.info("Collecting specified date columns", specified_cols=request.options.date_cols)
             for col in request.options.date_cols:
                 if col in master_df.columns:
                     date_columns.append(master_df[col])
                     date_column_names.append(col)
-            
+                    etl_logger.info(f"Added specified date column: {col}")
+
             # Auto-detect additional date columns
+            etl_logger.info("Auto-detecting additional date columns")
             auto_date_cols = detect_date_columns(master_df)
+            etl_logger.info("Auto-detected date columns", detected_cols=auto_date_cols)
+
             for col in auto_date_cols:
                 if col not in date_column_names and col in master_df.columns:
                     date_columns.append(master_df[col])
                     date_column_names.append(col)
-            
-            dim_dates = create_dim_dates(date_columns, date_column_names)
-            
+                    etl_logger.info(f"Added auto-detected date column: {col}")
+
+            etl_logger.info("Final date columns for dimension",
+                          total_columns=len(date_column_names),
+                          column_names=date_column_names)
+
+            dim_dates, date_role_bridge = create_dim_dates(date_columns, date_column_names)
+
+            etl_logger.info("=== DATE DIMENSION CREATION COMPLETE ===",
+                          dim_dates_rows=len(dim_dates),
+                          date_bridge_rows=len(date_role_bridge))
+
             # Prepare all DataFrames for storage
             all_dataframes = {
                 'masterbom_clean': master_results['masterbom_clean'],
                 'plant_item_status': master_results['plant_item_status'],
                 'fact_parts': master_results['fact_parts'],
                 'status_clean': status_clean,
-                'dim_dates': dim_dates
+                'project_completion_by_plant': project_completion,
+                'dim_dates': dim_dates,
+                'date_role_bridge': date_role_bridge
             }
             
             # Save data in multiple formats
@@ -155,16 +190,9 @@ async def transform_data(request: TransformRequest):
             # Calculate summary statistics
             summary = _calculate_summary(all_dataframes, date_column_names, start_time)
 
-            # Execute post-ETL pipeline
-            pipeline_service = PipelineService(etl_logger)
-            pipeline_results = pipeline_service.execute_post_etl_pipeline(
-                artifacts, all_dataframes, request.file_id
-            )
-
             etl_logger.info("ETL transformation completed successfully",
                            processing_time=summary.processing_time_seconds,
-                           total_artifacts=len(artifacts),
-                           pipeline_executed=pipeline_results.get("pipeline_executed", False))
+                           total_artifacts=len(artifacts))
 
             response = TransformResponse(
                 success=True,
@@ -172,10 +200,6 @@ async def transform_data(request: TransformRequest):
                 summary=summary,
                 messages=etl_logger.get_messages()
             )
-
-            # Add pipeline results to response
-            if hasattr(response, '__dict__'):
-                response.__dict__['pipeline_results'] = pipeline_results
 
             return response
             
@@ -279,36 +303,7 @@ async def get_transform_status(file_id: str):
     }
 
 
-@router.get("/pipeline/{file_id}/status")
-async def get_pipeline_status(file_id: str):
-    """
-    Get pipeline status for a specific file.
-
-    Args:
-        file_id: ID of the processed file
-
-    Returns:
-        Pipeline status information
-    """
-    try:
-        uuid.UUID(file_id)
-    except ValueError:
-        return {
-            "file_id": file_id,
-            "error": "Invalid file ID format"
-        }
-
-    try:
-        pipeline_service = PipelineService()
-        status = pipeline_service.get_pipeline_status(file_id)
-        return status
-
-    except Exception as e:
-        logger.error(f"Error in pipeline status endpoint: {e}")
-        return {
-            "file_id": file_id,
-            "error": str(e)
-        }
+# Pipeline status endpoint removed - manual ETL only
 
 
 

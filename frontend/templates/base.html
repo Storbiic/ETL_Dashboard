@@ -5,17 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{{ page_title or 'ETL Dashboard' }}{% endblock %}</title>
     
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
+    <!-- Tailwind CSS (Local) -->
+    <script src="{{ url_for('static', filename='vendor/js/tailwind.js') }}"></script>
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-    
-    <!-- Font Awesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
-    <!-- Chart.js for interactive charts -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <!-- Font Awesome for icons (Local) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/css/fontawesome.min.css') }}">
+
+    <!-- Chart.js for interactive charts (Local) -->
+    <script src="{{ url_for('static', filename='vendor/js/chart.min.js') }}"></script>
 
     {% block head %}{% endblock %}
 </head>
@@ -46,26 +46,83 @@
         </div>
     </nav>
 
-    <!-- Main Content -->
-    <main class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        {% if error %}
-        <div class="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
-            <div class="flex">
-                <div class="flex-shrink-0">
-                    <i class="fas fa-exclamation-circle text-red-400"></i>
+    <!-- Main Content with Side Panel Layout -->
+    <div class="flex min-h-screen bg-gray-50">
+        <!-- Main Content Area -->
+        <main class="flex-1 transition-all duration-300" id="main-content">
+            <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                {% if error %}
+                <div class="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-exclamation-circle text-red-400"></i>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-red-800">Error</h3>
+                            <div class="mt-2 text-sm text-red-700">
+                                {{ error }}
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="ml-3">
-                    <h3 class="text-sm font-medium text-red-800">Error</h3>
-                    <div class="mt-2 text-sm text-red-700">
-                        {{ error }}
+                {% endif %}
+
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+
+        <!-- Log Panel (Right Side) -->
+        <div id="log-panel" class="w-96 bg-white border-l border-gray-200 shadow-lg transform translate-x-full transition-transform duration-300 fixed right-0 top-16 bottom-0 z-40">
+            <!-- Panel Header -->
+            <div class="bg-gray-800 text-white px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center">
+                    <i class="fas fa-terminal mr-2"></i>
+                    <h3 class="font-semibold">ETL Logs</h3>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button id="clear-logs" class="text-gray-300 hover:text-white text-sm" title="Clear logs">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button id="toggle-log-panel" class="text-gray-300 hover:text-white" title="Toggle panel">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Panel Content -->
+            <div class="flex flex-col h-full">
+                <!-- Log Controls -->
+                <div class="px-4 py-2 bg-gray-50 border-b border-gray-200">
+                    <div class="flex items-center justify-between text-sm">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-gray-600">Auto-scroll:</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="auto-scroll-logs" class="sr-only peer" checked>
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                        <div class="flex items-center space-x-1">
+                            <span class="text-xs text-gray-500" id="log-count">0 entries</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Log Entries -->
+                <div id="log-entries" class="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2">
+                    <div class="text-center text-gray-500 text-sm py-8">
+                        <i class="fas fa-info-circle mb-2"></i>
+                        <p>No logs yet. Start an ETL process to see real-time updates.</p>
                     </div>
                 </div>
             </div>
         </div>
-        {% endif %}
 
-        {% block content %}{% endblock %}
-    </main>
+        <!-- Log Panel Toggle Button (when panel is closed) -->
+        <button id="show-log-panel" class="fixed right-4 top-20 bg-gray-800 text-white p-3 rounded-l-lg shadow-lg z-30 transform translate-x-0 transition-transform duration-300" title="Show logs">
+            <i class="fas fa-terminal"></i>
+            <span id="log-notification" class="absolute -top-1 -left-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center hidden">0</span>
+        </button>
+    </div>
 
     <!-- Footer -->
     <footer class="bg-white border-t mt-12">

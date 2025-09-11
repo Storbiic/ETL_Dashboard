@@ -33,8 +33,8 @@ class ExcelReader:
         
         return self._sheet_names
     
-    def read_sheet(self, sheet_name: str, dtype: str = "str", 
-                   nrows: Optional[int] = None) -> pd.DataFrame:
+    def read_sheet(self, sheet_name: str, dtype: str = "str",
+                   nrows: Optional[int] = None, clean_headers: bool = True) -> pd.DataFrame:
         """Read a specific sheet as DataFrame."""
         try:
             df = pd.read_excel(
@@ -44,22 +44,71 @@ class ExcelReader:
                 nrows=nrows,
                 engine='openpyxl'
             )
-            
-            logger.info(f"Read sheet '{sheet_name}'", 
+
+            # Clean multi-row headers if requested
+            if clean_headers:
+                df = self._clean_multi_row_headers(df, sheet_name)
+
+            logger.info(f"Read sheet '{sheet_name}'",
                        rows=len(df), cols=len(df.columns))
-            
+
             return df
-            
+
         except Exception as e:
             logger.error(f"Failed to read sheet '{sheet_name}': {e}")
             raise ValueError(f"Could not read sheet '{sheet_name}': {e}")
+
+    def _clean_multi_row_headers(self, df: pd.DataFrame, sheet_name: str) -> pd.DataFrame:
+        """Clean multi-row headers that are common in Excel files."""
+        if len(df) == 0:
+            return df
+
+        # Look for rows that appear to be continuation of headers
+        rows_to_remove = []
+
+        for i in range(min(5, len(df))):  # Check first 5 rows
+            row = df.iloc[i]
+            row_values = [str(val).strip() for val in row.values if pd.notna(val) and str(val).strip()]
+
+            if not row_values:  # Empty row
+                continue
+
+            # Check if this row looks like header continuation
+            # Indicators: contains parentheses, "remarks", "status", "date", etc.
+            header_indicators = [
+                '(', ')', 'remarks', 'status', 'date', 'details', 'deviation',
+                'under', 'available', 'promised', 'ok/nok', 'yes/no'
+            ]
+
+            indicator_count = sum(1 for val in row_values
+                                for indicator in header_indicators
+                                if indicator.lower() in val.lower())
+
+            # If more than 30% of non-empty values contain header indicators
+            if len(row_values) > 0 and indicator_count / len(row_values) > 0.3:
+                # Additional check: make sure it's not actual data
+                # Real data usually has part numbers (numeric) or specific patterns
+                numeric_like = sum(1 for val in row_values
+                                 if val.replace('-', '').replace('.', '').isdigit() and len(val) > 3)
+
+                # If less than 20% looks like part numbers, likely a header row
+                if numeric_like / len(row_values) < 0.2:
+                    rows_to_remove.append(i)
+                    logger.info(f"Detected header continuation row {i} in {sheet_name}: {row_values[:3]}")
+
+        # Remove detected header rows
+        if rows_to_remove:
+            df = df.drop(index=rows_to_remove).reset_index(drop=True)
+            logger.info(f"Removed {len(rows_to_remove)} header continuation rows from {sheet_name}")
+
+        return df
     
     def get_sheet_info(self, sheet_name: str) -> Dict[str, any]:
         """Get basic information about a sheet."""
-        df = self.read_sheet(sheet_name, nrows=1)  # Just read header
-        
+        df = self.read_sheet(sheet_name, nrows=1, clean_headers=False)  # Just read header
+
         # Get full sheet to count rows (inefficient but simple)
-        full_df = self.read_sheet(sheet_name)
+        full_df = self.read_sheet(sheet_name, clean_headers=False)
         
         return {
             "name": sheet_name,

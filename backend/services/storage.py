@@ -96,17 +96,17 @@ class DataStorage:
         """Save DataFrame as Parquet."""
         try:
             parquet_path = self.processed_folder / f"{table_name}.parquet"
-            
-            # Prepare DataFrame for Parquet (handle data types)
             df_parquet = df.copy()
-            
-            # Convert object columns with mixed types
+
             for col in df_parquet.columns:
-                if df_parquet[col].dtype == 'object':
-                    # Try to convert to string, handling None values
-                    df_parquet[col] = df_parquet[col].astype(str)
-                    df_parquet[col] = df_parquet[col].replace('nan', None)
-            
+                if pd.api.types.is_object_dtype(df_parquet[col]):
+                    # Try to coerce to datetime; if success, keep as datetime64
+                    coerced = pd.to_datetime(df_parquet[col], errors='coerce')
+                    if coerced.notna().sum() > 0:
+                        df_parquet[col] = coerced.dt.normalize()
+                    else:
+                        df_parquet[col] = df_parquet[col].astype(str).replace('nan', None)
+
             df_parquet.to_parquet(parquet_path, index=False, engine='pyarrow')
             
             file_size = parquet_path.stat().st_size
