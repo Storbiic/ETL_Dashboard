@@ -13,13 +13,24 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
 
-# Configuration
-FASTAPI_BASE_URL = f"http://{os.getenv('FASTAPI_HOST', '127.0.0.1')}:{os.getenv('FASTAPI_PORT', '8000')}"
+# Configuration for different deployment environments
+class Config:
+    # For Render deployment, backend runs on same container
+    if os.getenv('RENDER'):
+        FASTAPI_BASE_URL = os.getenv('BACKEND_URL', 'http://localhost:8000')
+    else:
+        FASTAPI_BASE_URL = f"http://{os.getenv('FASTAPI_HOST', '127.0.0.1')}:{os.getenv('FASTAPI_PORT', '8000')}"
+    
+    PORT = int(os.getenv('PORT', 5000))
+    DEBUG = os.getenv('FLASK_DEBUG', 'false').lower() == 'true'
+
+# Apply configuration
+FASTAPI_BASE_URL = Config.FASTAPI_BASE_URL
 
 # Get the project root directory (parent of frontend directory)
 PROJECT_ROOT = Path(__file__).parent.parent
 PROCESSED_FOLDER = PROJECT_ROOT / os.getenv('PROCESSED_FOLDER', 'data/processed')
-# Pipeline output folder removed - using processed folder only
+PIPELINE_OUTPUT_FOLDER = PROJECT_ROOT / os.getenv('PIPELINE_OUTPUT_FOLDER', 'data/pipeline_output')
 
 
 @app.route('/')
