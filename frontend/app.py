@@ -223,48 +223,70 @@ def download_powerbi_package(file_id):
     import zipfile
     import tempfile
     from datetime import datetime
-    from backend.services.dax_generator import DAXGenerator
-
+    
     try:
+        # Import DAX generator with error handling
+        try:
+            from backend.services.dax_generator import DAXGenerator
+        except ImportError as e:
+            print(f"Warning: Could not import DAXGenerator: {e}")
+            # Continue without DAX file
+            DAXGenerator = None
+
         # Get Parquet files from processed folder
         parquet_files = []
 
         if PROCESSED_FOLDER.exists():
+            print(f"Checking processed folder: {PROCESSED_FOLDER}")
             for file_path in PROCESSED_FOLDER.iterdir():
                 if file_path.is_file() and file_path.suffix.lower() == '.parquet':
                     parquet_files.append(file_path)
+                    print(f"Found parquet file: {file_path.name}")
 
         if not parquet_files:
+            print(f"No parquet files found in {PROCESSED_FOLDER}")
             return jsonify({"error": "No Parquet files found for Power BI package"}), 404
 
-        # Create temporary directory for DAX file
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Generate DAX measures file
-            dax_generator = DAXGenerator()
-            dax_file_path = dax_generator.generate_dax_file(temp_dir)
+        print(f"Found {len(parquet_files)} parquet files")
 
-            # Create temporary ZIP file
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp_file:
-                with zipfile.ZipFile(tmp_file.name, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                    # Add Parquet files to DATA_BI folder
-                    for file_path in parquet_files:
-                        zipf.write(file_path, f"DATA_BI/{file_path.name}")
+        # Create temporary ZIP file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as tmp_file:
+            with zipfile.ZipFile(tmp_file.name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                # Add Parquet files to DATA_BI folder
+                for file_path in parquet_files:
+                    zipf.write(file_path, f"DATA_BI/{file_path.name}")
+                    print(f"Added to zip: DATA_BI/{file_path.name}")
 
-                    # Add DAX measures file to DATA_BI folder
-                    zipf.write(dax_file_path, f"DATA_BI/ETL_Dashboard_Measures.dax")
+                # Try to add DAX measures file if DAXGenerator is available
+                if DAXGenerator:
+                    try:
+                        with tempfile.TemporaryDirectory() as temp_dir:
+                            dax_generator = DAXGenerator()
+                            dax_file_path = dax_generator.generate_dax_file(temp_dir)
+                            zipf.write(dax_file_path, f"DATA_BI/ETL_Dashboard_Measures.dax")
+                            print("Added DAX measures file to zip")
+                    except Exception as dax_error:
+                        print(f"Warning: Could not generate DAX file: {dax_error}")
+                        # Continue without DAX file
+                else:
+                    print("Skipping DAX file generation (DAXGenerator not available)")
 
-                # Generate download filename with timestamp
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                download_filename = f"DATA_BI_{timestamp}.zip"
+            # Generate download filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            download_filename = f"DATA_BI_{timestamp}.zip"
 
-                return send_file(
-                    tmp_file.name,
-                    as_attachment=True,
-                    download_name=download_filename,
-                    mimetype='application/zip'
-                )
+            print(f"Sending zip file: {download_filename}")
+            return send_file(
+                tmp_file.name,
+                as_attachment=True,
+                download_name=download_filename,
+                mimetype='application/zip'
+            )
 
     except Exception as e:
+        print(f"Error in download_powerbi_package: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
