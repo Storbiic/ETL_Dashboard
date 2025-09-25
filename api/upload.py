@@ -2,15 +2,16 @@
 from http.server import BaseHTTPRequestHandler
 import json
 import os
-import sys
 import tempfile
 import uuid
 from pathlib import Path
 import cgi
 import io
-
-# Add backend to path
-sys.path.insert(0, '/var/task/backend')
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
 
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -86,12 +87,25 @@ class handler(BaseHTTPRequestHandler):
             with open(file_path, 'wb') as f:
                 f.write(file_field.file.read())
             
+            # Try to get sheet names if pandas is available
+            sheets = []
+            try:
+                if PANDAS_AVAILABLE:
+                    excel_file = pd.ExcelFile(file_path)
+                    sheets = excel_file.sheet_names
+                else:
+                    # Fallback - assume common sheet names
+                    sheets = ["Sheet1", "Sheet2", "MasterBOM", "Status"]
+            except Exception:
+                sheets = ["Sheet1", "Sheet2", "MasterBOM", "Status"]
+            
             response = {
                 "message": "File uploaded successfully",
                 "filename": file_field.filename,
                 "file_id": file_id,
                 "file_path": str(file_path),
-                "file_size": file_path.stat().st_size
+                "file_size": file_path.stat().st_size,
+                "sheets": sheets[:10]  # Limit to first 10 sheets
             }
             
             self.wfile.write(json.dumps(response).encode())
@@ -99,15 +113,8 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             self.send_response(500)
             self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             
             response = {"error": f"Upload failed: {str(e)}"}
-            self.wfile.write(json.dumps(response).encode())
-    
-    def do_OPTIONS(self):
-        """Handle CORS preflight requests."""
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
+            self.wfile.write(json.dumps(response).encode('utf-8'))

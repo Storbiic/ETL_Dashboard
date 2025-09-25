@@ -8,6 +8,15 @@ class handler(BaseHTTPRequestHandler):
         """Serve the main dashboard page."""
         self.send_response(200)
         self.send_header('Content-Type', 'text/html')
+        # Add CSP header to prevent eval() while allowing inline scripts
+        self.send_header('Content-Security-Policy', 
+            "default-src 'self'; " +
+            "script-src 'self' 'unsafe-inline'; " +
+            "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; " +
+            "font-src 'self' https://cdnjs.cloudflare.com; " +
+            "img-src 'self' data: https:; " +
+            "connect-src 'self'"
+        )
         self.end_headers()
         
         # Get the current Vercel URL
@@ -25,13 +34,41 @@ class handler(BaseHTTPRequestHandler):
     <title>ETL Dashboard</title>
     
     <!-- Tailwind CSS (production build) -->
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.0/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        /* Core Tailwind utilities for production */
+        .hidden { display: none !important; }
+        .block { display: block !important; }
+        .flex { display: flex !important; }
+        .grid { display: grid !important; }
+        .relative { position: relative !important; }
+        .absolute { position: absolute !important; }
+        .w-full { width: 100% !important; }
+        .h-full { height: 100% !important; }
+        .max-w-4xl { max-width: 56rem !important; }
+        .mx-auto { margin-left: auto !important; margin-right: auto !important; }
+        .px-4 { padding-left: 1rem !important; padding-right: 1rem !important; }
+        .py-8 { padding-top: 2rem !important; padding-bottom: 2rem !important; }
+        .mb-8 { margin-bottom: 2rem !important; }
+        .text-center { text-align: center !important; }
+        .text-3xl { font-size: 1.875rem !important; line-height: 2.25rem !important; }
+        .font-bold { font-weight: 700 !important; }
+        .text-blue-600 { color: rgb(37 99 235) !important; }
+        .text-gray-600 { color: rgb(75 85 99) !important; }
+        .bg-white { background-color: rgb(255 255 255) !important; }
+        .bg-blue-500 { background-color: rgb(59 130 246) !important; }
+        .hover\\:bg-blue-600:hover { background-color: rgb(37 99 235) !important; }
+        .text-white { color: rgb(255 255 255) !important; }
+        .rounded-lg { border-radius: 0.5rem !important; }
+        .border-2 { border-width: 2px !important; }
+        .border-dashed { border-style: dashed !important; }
+        .border-gray-300 { border-color: rgb(209 213 219) !important; }
+        .p-8 { padding: 2rem !important; }
+        .cursor-pointer { cursor: pointer !important; }
+        .transition-all { transition-property: all !important; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important; transition-duration: 150ms !important; }
+    </style>
     
     <!-- Font Awesome CDN -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Chart.js CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
         .fade-in {{
@@ -205,7 +242,7 @@ class handler(BaseHTTPRequestHandler):
                         <i class="fas fa-upload mr-2 text-blue-600"></i>
                         Step 1: Upload Excel Workbook
                     </h2>
-                    <button id="show-logs-btn" class="text-gray-500 hover:text-gray-700 text-sm" onclick="toggleLogPanel()">
+                    <button id="show-logs-btn" class="text-gray-500 hover:text-gray-700 text-sm">
                         <i class="fas fa-terminal mr-1"></i>
                         Show Logs
                     </button>
@@ -346,8 +383,7 @@ class handler(BaseHTTPRequestHandler):
                     </div>
                     <button id="preview-btn"
                             class="bg-gray-400 text-white px-6 py-3 rounded-md font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-105"
-                            disabled
-                            onclick="previewSheets()">
+                            disabled>
                         <i class="fas fa-eye mr-2"></i>
                         Preview Sheets
                     </button>
@@ -404,12 +440,12 @@ class handler(BaseHTTPRequestHandler):
                     </div>
 
                     <div class="flex justify-between items-center pt-4">
-                        <button onclick="window.history.back()" class="text-blue-600 hover:text-blue-800 transition-colors">
+                        <button id="back-btn" class="text-blue-600 hover:text-blue-800 transition-colors">
                             <i class="fas fa-arrow-left mr-2"></i>
                             Back to Profile
                         </button>
 
-                        <button id="run-transform-btn" onclick="runTransform()"
+                        <button id="run-transform-btn"
                                 class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-md font-medium transition-all duration-200 transform hover:scale-105">
                             <i class="fas fa-play mr-2"></i>
                             Run ETL Transform
@@ -451,6 +487,7 @@ class handler(BaseHTTPRequestHandler):
             console.log('DOM Content Loaded - Initializing application...');
             initializeUpload();
             initializeSheetSelection();
+            initializeEventListeners();
             console.log('Application initialized');
         }});
 
@@ -496,6 +533,33 @@ class handler(BaseHTTPRequestHandler):
         // Sheet selection initialization
         function initializeSheetSelection() {{
             // Sheet selection handlers will be added when sheets are loaded
+        }}
+
+        // Initialize event listeners for buttons (replacing onclick attributes)
+        function initializeEventListeners() {{
+            // Log panel toggle button
+            const showLogsBtn = document.getElementById('show-logs-btn');
+            if (showLogsBtn) {{
+                showLogsBtn.addEventListener('click', toggleLogPanel);
+            }}
+
+            // Preview sheets button
+            const previewBtn = document.getElementById('preview-btn');
+            if (previewBtn) {{
+                previewBtn.addEventListener('click', previewSheets);
+            }}
+
+            // Back button
+            const backBtn = document.getElementById('back-btn');
+            if (backBtn) {{
+                backBtn.addEventListener('click', () => window.history.back());
+            }}
+
+            // Run transform button
+            const runTransformBtn = document.getElementById('run-transform-btn');
+            if (runTransformBtn) {{
+                runTransformBtn.addEventListener('click', runTransform);
+            }}
         }}
 
         // Log panel toggle

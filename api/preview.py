@@ -1,12 +1,13 @@
-"""File preview endpoint for Vercel deployment."""
+"""File preview endpoint for Vercel deployment - Simplified version."""
 from http.server import BaseHTTPRequestHandler
 import json
-import os
-import sys
 from pathlib import Path
 
-# Add backend to path
-sys.path.insert(0, '/var/task/backend')
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
 
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -25,28 +26,34 @@ class handler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
             self.end_headers()
             
-            # Read request data
+            # Get request data
             content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            request_data = json.loads(post_data.decode('utf-8'))
-            
-            file_id = request_data.get('file_id')
-            if not file_id:
-                response = {"error": "file_id is required"}
-                self.wfile.write(json.dumps(response).encode())
+            if content_length == 0:
+                response = {"error": "No data received"}
+                self.wfile.write(json.dumps(response).encode('utf-8'))
                 return
             
-            # Import backend services
+            post_data = self.rfile.read(content_length)
             try:
-                from services.excel_reader import ExcelReader
-                from services.profiler import DataProfiler
-            except ImportError as e:
-                response = {"error": f"Failed to import backend services: {str(e)}"}
-                self.wfile.write(json.dumps(response).encode())
+                request_data = json.loads(post_data.decode('utf-8'))
+            except json.JSONDecodeError:
+                response = {"error": "Invalid JSON data"}
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+                return
+            
+            file_id = request_data.get('file_id')
+            sheet_name = request_data.get('sheet_name')
+            
+            if not file_id or not sheet_name:
+                response = {"error": "file_id and sheet_name are required"}
+                self.wfile.write(json.dumps(response).encode('utf-8'))
+                return
+            
+            if not PANDAS_AVAILABLE:
+                response = {"error": "Excel processing not available - pandas not installed"}
+                self.wfile.write(json.dumps(response).encode('utf-8'))
                 return
             
             # Find the uploaded file
@@ -62,44 +69,47 @@ class handler(BaseHTTPRequestHandler):
             
             if not file_path:
                 response = {"error": "File not found"}
-                self.wfile.write(json.dumps(response).encode())
+                self.wfile.write(json.dumps(response).encode('utf-8'))
                 return
             
-            # Read and preview the file
-            reader = ExcelReader(str(file_path))
-            sheets_info = reader.get_sheet_info()
-            
-            preview_data = {}
-            for sheet_name in sheets_info.keys():
-                df = reader.read_sheet(sheet_name, nrows=5)  # Preview first 5 rows
-                preview_data[sheet_name] = {
-                    "columns": df.columns.tolist(),
-                    "data": df.to_dict('records'),
-                    "shape": df.shape,
-                    "dtypes": df.dtypes.astype(str).to_dict()
+            # Read the Excel sheet (first 10 rows for preview)
+            try:
+                df = pd.read_excel(file_path, sheet_name=sheet_name, nrows=10)
+                
+                # Convert to JSON-serializable format
+                preview_data = []
+                for _, row in df.iterrows():
+                    row_data = {}
+                    for col in df.columns:
+                        value = row[col]
+                        if pd.isna(value):
+                            value = None
+                        elif hasattr(value, 'isoformat'):  # datetime
+                            value = value.isoformat()
+                        else:
+                            value = str(value)
+                        row_data[str(col)] = value
+                    preview_data.append(row_data)
+                
+                response = {
+                    "message": "Sheet preview loaded successfully",
+                    "sheet_name": sheet_name,
+                    "columns": [str(col) for col in df.columns.tolist()],
+                    "data": preview_data,
+                    "total_columns": len(df.columns),
+                    "preview_rows": len(preview_data)
                 }
+                
+            except Exception as e:
+                response = {"error": f"Failed to read sheet '{sheet_name}': {str(e)}"}
             
-            response = {
-                "file_id": file_id,
-                "sheets_info": sheets_info,
-                "preview_data": preview_data,
-                "total_sheets": len(sheets_info)
-            }
-            
-            self.wfile.write(json.dumps(response, default=str).encode())
+            self.wfile.write(json.dumps(response).encode('utf-8'))
             
         except Exception as e:
             self.send_response(500)
             self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
             
             response = {"error": f"Preview failed: {str(e)}"}
-            self.wfile.write(json.dumps(response).encode())
-    
-    def do_OPTIONS(self):
-        """Handle CORS preflight requests."""
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
+            self.wfile.write(json.dumps(response).encode('utf-8'))

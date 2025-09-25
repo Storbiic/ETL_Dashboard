@@ -18,14 +18,19 @@ class Config:
     # For Render deployment, backend runs on same container
     if os.getenv('RENDER'):
         FASTAPI_BASE_URL = os.getenv('BACKEND_URL', 'http://localhost:8000')
+        FASTAPI_BROWSER_URL = FASTAPI_BASE_URL  # Same for Render
     else:
+        # For Docker, internal communication uses service name
         FASTAPI_BASE_URL = f"http://{os.getenv('FASTAPI_HOST', '127.0.0.1')}:{os.getenv('FASTAPI_PORT', '8000')}"
+        # For browser, always use localhost (Docker port mapping)
+        FASTAPI_BROWSER_URL = f"http://localhost:{os.getenv('FASTAPI_PORT', '8000')}"
     
     PORT = int(os.getenv('PORT', 5000))
     DEBUG = os.getenv('FLASK_DEBUG', 'false').lower() == 'true'
 
 # Apply configuration
 FASTAPI_BASE_URL = Config.FASTAPI_BASE_URL
+FASTAPI_BROWSER_URL = Config.FASTAPI_BROWSER_URL
 
 # Get the project root directory (parent of frontend directory)
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -37,7 +42,7 @@ PIPELINE_OUTPUT_FOLDER = PROJECT_ROOT / os.getenv('PIPELINE_OUTPUT_FOLDER', 'dat
 def index():
     """Main dashboard page with stepper interface."""
     return render_template('index.html', 
-                         fastapi_url=FASTAPI_BASE_URL,
+                         fastapi_url=FASTAPI_BROWSER_URL,
                          page_title="ETL Dashboard")
 
 
@@ -54,7 +59,7 @@ def preview():
     return render_template('preview.html',
                          file_id=file_id,
                          sheet=sheet,
-                         fastapi_url=FASTAPI_BASE_URL,
+                         fastapi_url=FASTAPI_BROWSER_URL,
                          page_title="Sheet Preview")
 
 
@@ -73,7 +78,7 @@ def profile():
                          file_id=file_id,
                          master_sheet=master_sheet,
                          status_sheet=status_sheet,
-                         fastapi_url=FASTAPI_BASE_URL,
+                         fastapi_url=FASTAPI_BROWSER_URL,
                          page_title="Data Profile")
 
 
@@ -88,7 +93,7 @@ def results():
 
     return render_template('results.html',
                          file_id=file_id,
-                         fastapi_url=FASTAPI_BASE_URL,
+                         fastapi_url=FASTAPI_BROWSER_URL,
                          page_title="ETL Results")
 
 
@@ -96,7 +101,7 @@ def results():
 def logs():
     """Logs page for monitoring system activity."""
     return render_template('logs.html',
-                         fastapi_url=FASTAPI_BASE_URL,
+                         fastapi_url=FASTAPI_BROWSER_URL,
                          page_title="System Logs")
 
 
