@@ -7,7 +7,6 @@ let uploadedSheets = [];
 let logEntries = [];
 let logPanelOpen = false;
 let startTime = null;
-let timerInterval = null;
 
 // API base URL (will be set from template)
 let FASTAPI_URL = window.FASTAPI_URL || 'http://127.0.0.1:8000';
@@ -64,7 +63,6 @@ async function runTransform() {
     const progressBar = document.getElementById('transform-progress-bar');
     const statusText = document.getElementById('transform-status');
     const percentageText = document.getElementById('transform-percentage');
-    const timerText = document.getElementById('transform-timer');
 
     // Get selected sheets from URL params or stored values
     const urlParams = new URLSearchParams(window.location.search);
@@ -82,17 +80,6 @@ async function runTransform() {
     transformBtn.disabled = true;
     transformBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processing...';
     transformProgress.classList.remove('hidden');
-
-    // Start timer
-    const transformStartTime = new Date();
-    const transformTimer = setInterval(() => {
-        const elapsed = Math.floor((new Date() - transformStartTime) / 1000);
-        const minutes = Math.floor(elapsed / 60);
-        const seconds = elapsed % 60;
-        if (timerText) {
-            timerText.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-        }
-    }, 1000);
 
     updateStepProgress(4, 0, 'current');
     addLogEntry('INFO', 'Starting ETL transformation process...');
@@ -149,7 +136,6 @@ async function runTransform() {
         const result = await response.json();
 
         // Complete the transformation
-        clearInterval(transformTimer);
         updateStepProgress(4, 100, 'completed');
 
         if (statusText) statusText.textContent = 'Transform completed successfully!';
@@ -167,7 +153,6 @@ async function runTransform() {
         }, 2000);
 
     } catch (error) {
-        clearInterval(transformTimer);
         console.error('Transform error:', error);
 
         updateStepProgress(4, 0, 'error');
@@ -335,21 +320,6 @@ function clearLogs() {
 // Progress Tracking
 function initializeProgressTracking() {
     startTime = new Date();
-    updateTimer();
-    timerInterval = setInterval(updateTimer, 1000);
-}
-
-function updateTimer() {
-    if (!startTime) return;
-
-    const elapsed = Math.floor((new Date() - startTime) / 1000);
-    const minutes = Math.floor(elapsed / 60);
-    const seconds = elapsed % 60;
-
-    const timerElement = document.getElementById('elapsed-time');
-    if (timerElement) {
-        timerElement.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    }
 }
 
 function updateStepProgress(step, percentage = 0, status = 'pending') {
