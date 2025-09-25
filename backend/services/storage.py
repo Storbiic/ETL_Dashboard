@@ -61,19 +61,27 @@ class DataStorage:
         return artifacts
     
     def _save_csv(self, table_name: str, df: pd.DataFrame) -> List[ArtifactInfo]:
-        """Save DataFrame as CSV."""
+        """Save DataFrame as CSV with optimized settings."""
         try:
             csv_path = self.processed_folder / f"{table_name}.csv"
             
-            # Convert datetime columns to strings for CSV compatibility
+            # Convert datetime columns to strings for CSV compatibility (optimized)
             df_csv = df.copy()
             for col in df_csv.columns:
-                if df_csv[col].dtype == 'datetime64[ns]':
+                if pd.api.types.is_datetime64_any_dtype(df_csv[col]):
+                    # Use vectorized string conversion for better performance
                     df_csv[col] = df_csv[col].dt.strftime('%Y-%m-%d')
-                elif 'date' in str(df_csv[col].dtype):
+                elif 'datetime' in str(df_csv[col].dtype).lower():
                     df_csv[col] = df_csv[col].astype(str)
             
-            df_csv.to_csv(csv_path, index=False, encoding='utf-8')
+            # Save with optimized settings for large files
+            df_csv.to_csv(
+                csv_path, 
+                index=False, 
+                encoding='utf-8',
+                chunksize=10000 if len(df_csv) > 50000 else None,  # Chunk large datasets
+                compression=None  # No compression for CSV (faster)
+            )
             
             file_size = csv_path.stat().st_size
             
@@ -93,24 +101,86 @@ class DataStorage:
             return []
     
     def _save_parquet(self, table_name: str, df: pd.DataFrame) -> List[ArtifactInfo]:
-        """Save DataFrame as Parquet."""
+        """Save DataFrame as Parquet with optimized data type handling."""
         try:
             parquet_path = self.processed_folder / f"{table_name}.parquet"
             df_parquet = df.copy()
 
+            # Common date formats to try (most common first for performance)
+            date_formats = [
+                '%Y-%m-%d',
+                '%m/%d/%Y', 
+                '%d/%m/%Y',
+                '%Y-%m-%d %H:%M:%S',
+                '%m/%d/%Y %H:%M:%S'
+            ]
+            
+            # Known date column patterns (case-insensitive)
+            date_column_patterns = [
+                'date', 'created', 'updated', 'modified', 'due', 'start', 'end',
+                'delivery', 'required', 'planned', 'actual', 'forecast'
+            ]
+
+            # Performance optimization: Log processing start for large datasets
+            if len(df_parquet) > 50000:
+                self.logger.info(f"Processing large dataset: {table_name}", 
+                               rows=len(df_parquet), columns=len(df_parquet.columns))
+
             for col in df_parquet.columns:
-                # Special handling for percentage columns to ensure they're floats
+                # Special handling for percentage columns
                 if col.endswith('_pct'):
                     df_parquet[col] = pd.to_numeric(df_parquet[col], errors='coerce')
-                elif pd.api.types.is_object_dtype(df_parquet[col]):
-                    # Try to coerce to datetime; if success, keep as datetime64
-                    coerced = pd.to_datetime(df_parquet[col], errors='coerce')
-                    if coerced.notna().sum() > 0:
-                        df_parquet[col] = coerced.dt.normalize()
+                    continue
+                
+                # Skip if already datetime or numeric
+                if pd.api.types.is_datetime64_any_dtype(df_parquet[col]) or pd.api.types.is_numeric_dtype(df_parquet[col]):
+                    continue
+                    
+                # Only process object columns that might be dates
+                if pd.api.types.is_object_dtype(df_parquet[col]):
+                    col_lower = col.lower()
+                    
+                    # Check if column name suggests it's a date
+                    is_likely_date = any(pattern in col_lower for pattern in date_column_patterns)
+                    
+                    if is_likely_date:
+                        # Try optimized datetime parsing with specific formats
+                        parsed_date = None
+                        sample_values = df_parquet[col].dropna().head(100)  # Sample for format detection
+                        
+                        if len(sample_values) > 0:
+                            for date_format in date_formats:
+                                try:
+                                    # Test format on sample
+                                    test_parse = pd.to_datetime(sample_values.iloc[0], format=date_format)
+                                    # If successful, apply to whole column
+                                    parsed_date = pd.to_datetime(df_parquet[col], format=date_format, errors='coerce')
+                                    break
+                                except (ValueError, TypeError):
+                                    continue
+                            
+                            # If no specific format worked, try general parsing but with cache
+                            if parsed_date is None or parsed_date.isna().all():
+                                parsed_date = pd.to_datetime(df_parquet[col], errors='coerce', cache=True)
+                            
+                            # Only replace if we got valid dates (>10% success rate)
+                            if parsed_date.notna().sum() > len(df_parquet) * 0.1:
+                                df_parquet[col] = parsed_date.dt.normalize()
+                            else:
+                                # Not a date column, convert to string efficiently
+                                df_parquet[col] = df_parquet[col].astype('string').replace('<NA>', None)
                     else:
-                        df_parquet[col] = df_parquet[col].astype(str).replace('nan', None)
+                        # Non-date object column - convert to string efficiently
+                        df_parquet[col] = df_parquet[col].astype('string').replace('<NA>', None)
 
-            df_parquet.to_parquet(parquet_path, index=False, engine='pyarrow')
+            # Save with optimized settings
+            df_parquet.to_parquet(
+                parquet_path, 
+                index=False, 
+                engine='pyarrow',
+                compression='snappy',  # Fast compression
+                use_deprecated_int96_timestamps=False
+            )
             
             file_size = parquet_path.stat().st_size
             

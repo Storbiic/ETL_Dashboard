@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     default_id_column: str = Field(default="YAZAKI PN", alias="DEFAULT_ID_COLUMN")
     max_preview_rows: int = Field(default=10, alias="MAX_PREVIEW_ROWS")
     chunk_size: int = Field(default=10000, alias="CHUNK_SIZE")
+    enable_performance_optimizations: bool = Field(default=True, alias="ENABLE_PERFORMANCE_OPTIMIZATIONS")
+    large_dataset_threshold: int = Field(default=50000, alias="LARGE_DATASET_THRESHOLD")
     
     class Config:
         env_file = ".env"
