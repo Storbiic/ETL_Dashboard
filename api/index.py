@@ -24,9 +24,6 @@ class handler(BaseHTTPRequestHandler):
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ETL Dashboard</title>
     
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
     <!-- Font Awesome CDN -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -34,6 +31,92 @@ class handler(BaseHTTPRequestHandler):
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
+        /* Reset and base styles */
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.5;
+            color: #1f2937;
+            background-color: #f9fafb;
+        }}
+        
+        /* Utility classes (Tailwind-like) */
+        .bg-gray-50 {{ background-color: #f9fafb; }}
+        .bg-white {{ background-color: #ffffff; }}
+        .bg-blue-600 {{ background-color: #2563eb; }}
+        .bg-green-600 {{ background-color: #059669; }}
+        .bg-gray-300 {{ background-color: #d1d5db; }}
+        
+        .text-gray-900 {{ color: #111827; }}
+        .text-gray-600 {{ color: #4b5563; }}
+        .text-gray-500 {{ color: #6b7280; }}
+        .text-gray-400 {{ color: #9ca3af; }}
+        .text-white {{ color: #ffffff; }}
+        .text-blue-600 {{ color: #2563eb; }}
+        .text-green-600 {{ color: #059669; }}
+        .text-red-600 {{ color: #dc2626; }}
+        
+        .min-h-screen {{ min-height: 100vh; }}
+        .max-w-4xl {{ max-width: 56rem; }}
+        .mx-auto {{ margin-left: auto; margin-right: auto; }}
+        .p-8 {{ padding: 2rem; }}
+        .p-6 {{ padding: 1.5rem; }}
+        .p-4 {{ padding: 1rem; }}
+        .py-2 {{ padding-top: 0.5rem; padding-bottom: 0.5rem; }}
+        .px-4 {{ padding-left: 1rem; padding-right: 1rem; }}
+        .mt-8 {{ margin-top: 2rem; }}
+        .mb-8 {{ margin-bottom: 2rem; }}
+        .mb-6 {{ margin-bottom: 1.5rem; }}
+        .mb-4 {{ margin-bottom: 1rem; }}
+        .mb-2 {{ margin-bottom: 0.5rem; }}
+        
+        .rounded-lg {{ border-radius: 0.5rem; }}
+        .rounded-full {{ border-radius: 9999px; }}
+        .shadow {{ box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1); }}
+        .shadow-lg {{ box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }}
+        
+        .flex {{ display: flex; }}
+        .items-center {{ align-items: center; }}
+        .justify-between {{ justify-content: space-between; }}
+        .justify-center {{ justify-content: center; }}
+        .space-x-4 > * + * {{ margin-left: 1rem; }}
+        
+        .text-3xl {{ font-size: 1.875rem; }}
+        .text-2xl {{ font-size: 1.5rem; }}
+        .text-xl {{ font-size: 1.25rem; }}
+        .text-lg {{ font-size: 1.125rem; }}
+        .text-sm {{ font-size: 0.875rem; }}
+        .text-xs {{ font-size: 0.75rem; }}
+        
+        .font-bold {{ font-weight: 700; }}
+        .font-semibold {{ font-weight: 600; }}
+        .font-medium {{ font-weight: 500; }}
+        
+        .w-full {{ width: 100%; }}
+        .w-12 {{ width: 3rem; }}
+        .h-12 {{ height: 3rem; }}
+        .h-2 {{ height: 0.5rem; }}
+        
+        .hidden {{ display: none; }}
+        .block {{ display: block; }}
+        
+        .border {{ border-width: 1px; }}
+        .border-2 {{ border-width: 2px; }}
+        .border-dashed {{ border-style: dashed; }}
+        .border-gray-300 {{ border-color: #d1d5db; }}
+        
+        .cursor-pointer {{ cursor: pointer; }}
+        .transition-all {{ transition-property: all; transition-duration: 0.15s; }}
+        
+        .hover\\:bg-blue-700:hover {{ background-color: #1d4ed8; }}
+        .hover\\:bg-gray-50:hover {{ background-color: #f9fafb; }}
+        
+        /* Custom component styles */
         .step-container {{
             transition: all 0.3s ease;
         }}
@@ -360,14 +443,32 @@ class handler(BaseHTTPRequestHandler):
         }}
 
         // Health check on page load
-        fetch(API_BASE_URL + '/api/health')
-            .then(response => response.json())
-            .then(data => {{
-                console.log('API Health:', data);
-            }})
-            .catch(error => {{
+        async function checkHealth() {{
+            try {{
+                const response = await fetch(API_BASE_URL + '/api/health');
+                if (response.ok) {{
+                    const data = await response.json();
+                    console.log('API Health:', data);
+                }} else {{
+                    console.warn('API Health Check returned non-200 status:', response.status);
+                }}
+            }} catch (error) {{
                 console.error('API Health Check Failed:', error);
-            }});
+            }}
+        }}
+        
+        // Run health check when DOM is loaded
+        if (document.readyState === 'loading') {{
+            document.addEventListener('DOMContentLoaded', checkHealth);
+        }} else {{
+            checkHealth();
+        }}
+        
+        // Prevent unhandled promise rejections
+        window.addEventListener('unhandledrejection', function(event) {{
+            console.error('Unhandled promise rejection:', event.reason);
+            event.preventDefault(); // Prevent the default browser behavior
+        }});
     </script>
 </body>
 </html>
