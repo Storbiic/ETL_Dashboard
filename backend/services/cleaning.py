@@ -265,6 +265,8 @@ def detect_date_columns(df: pd.DataFrame) -> List[str]:
     exclude_patterns = [
         r'supplier.*pn',
         r'original.*supplier.*pn',
+        r'supplier pn',
+        r'original supplier pn',
         r'part.*number',
         r'pn$',
         r'id$',

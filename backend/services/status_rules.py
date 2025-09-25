@@ -379,6 +379,7 @@ class StatusProcessor:
                             'overall_completion_pct': None,
                             'psw_completion_pct': None,
                             'drawing_completion_pct': None,
+                            'imds_completion_pct': None,
                             'ppap_completion_pct': None,
                             'completion_status': 'Unknown',
                             'milestone_date': None,
@@ -397,6 +398,10 @@ class StatusProcessor:
                                     value = value.iloc[0] if len(value) > 0 else None
                             except (KeyError, IndexError):
                                 continue
+                                
+                            # Special handling for drawing (may be referred to as '%.1 drawing')
+                            if '.1' in col_lower and 'drawing' in col_lower:
+                                col_lower = 'drawing'  # Normalize to 'drawing' for matching below
 
                             if pd.notna(value):
                                 # Parse completion value
@@ -407,6 +412,8 @@ class StatusProcessor:
                                     completion_record['psw_completion_pct'] = completion_pct
                                 elif 'drawing' in col_lower:
                                     completion_record['drawing_completion_pct'] = completion_pct
+                                elif 'imds' in col_lower:
+                                    completion_record['imds_completion_pct'] = completion_pct
                                 elif 'ppap' in col_lower:
                                     completion_record['ppap_completion_pct'] = completion_pct
                                 elif any(keyword in col_lower for keyword in ['total', 'overall', 'complete']):
@@ -578,7 +585,7 @@ class StatusProcessor:
         # Collect all available completion percentages
         completion_values = []
 
-        for key in ['overall_completion_pct', 'psw_completion_pct', 'drawing_completion_pct', 'ppap_completion_pct']:
+        for key in ['overall_completion_pct', 'psw_completion_pct', 'drawing_completion_pct', 'imds_completion_pct', 'ppap_completion_pct']:
             value = record.get(key)
             if value is not None:
                 completion_values.append(value)

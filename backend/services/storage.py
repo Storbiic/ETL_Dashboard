@@ -99,7 +99,10 @@ class DataStorage:
             df_parquet = df.copy()
 
             for col in df_parquet.columns:
-                if pd.api.types.is_object_dtype(df_parquet[col]):
+                # Special handling for percentage columns to ensure they're floats
+                if col.endswith('_pct'):
+                    df_parquet[col] = pd.to_numeric(df_parquet[col], errors='coerce')
+                elif pd.api.types.is_object_dtype(df_parquet[col]):
                     # Try to coerce to datetime; if success, keep as datetime64
                     coerced = pd.to_datetime(df_parquet[col], errors='coerce')
                     if coerced.notna().sum() > 0:

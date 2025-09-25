@@ -103,10 +103,7 @@ async function runTransform() {
             file_id: fileId,
             master_sheet: masterSheet,
             status_sheet: statusSheet,
-            options: {
-                date_cols: ["Approved Date", "Promised Date", "PSW Date OK", "FAR Promised date"],
-                id_col: "YAZAKI PN"
-            }
+            options: getDateColumnOptions() // Use our centralized date column options
         };
 
         addLogEntry('INFO', `Transform request: MasterBOM="${masterSheet}", Status="${statusSheet}"`);

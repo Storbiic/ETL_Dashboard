@@ -243,6 +243,30 @@ class StatusProcessorV2:
     
     def _create_derived_fields(self):
         """Create derived fields according to specification."""
+        # Calculate psw_completion_pct = psw_available / total_parts
+        if 'psw_available' in self.df.columns and 'total_parts' in self.df.columns:
+            self.df['psw_completion_pct'] = np.where(
+                (self.df['total_parts'] > 0) & self.df['total_parts'].notna(),
+                self.df['psw_available'] / self.df['total_parts'],
+                np.nan
+            )
+        
+        # Calculate drawing_completion_pct = drawing_available / total_parts
+        if 'drawing_available' in self.df.columns and 'total_parts' in self.df.columns:
+            self.df['drawing_completion_pct'] = np.where(
+                (self.df['total_parts'] > 0) & self.df['total_parts'].notna(),
+                self.df['drawing_available'] / self.df['total_parts'],
+                np.nan
+            )
+        
+        # Calculate imds_completion_pct = imds_total / total_parts
+        if 'imds_total' in self.df.columns and 'total_parts' in self.df.columns:
+            self.df['imds_completion_pct'] = np.where(
+                (self.df['total_parts'] > 0) & self.df['total_parts'].notna(),
+                self.df['imds_total'] / self.df['total_parts'],
+                np.nan
+            )
+            
         # ppap_completion_pct = m2_parts_psw_ok / m2_parts
         if 'm2_parts_psw_ok' in self.df.columns and 'm2_parts' in self.df.columns:
             self.df['ppap_completion_pct'] = np.where(
@@ -282,6 +306,12 @@ class StatusProcessorV2:
         
         # Reorder columns to match specification
         self.df = self.df[self.required_columns]
+        
+        # Ensure percentage columns are explicitly cast to float
+        pct_cols = ['psw_completion_pct', 'drawing_completion_pct', 'imds_completion_pct', 'ppap_completion_pct', 'overall_completion_pct']
+        for col in pct_cols:
+            if col in self.df.columns:
+                self.df[col] = self.df[col].astype(float)
         
         self.logger.info("Output validation complete",
                         final_columns=list(self.df.columns),

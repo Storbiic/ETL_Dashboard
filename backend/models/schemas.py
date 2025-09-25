@@ -61,6 +61,7 @@ class ProfileResponse(BaseModel):
 class TransformOptions(BaseModel):
     """Options for ETL transformation."""
     date_cols: List[str] = Field(default_factory=list)
+    excluded_date_cols: List[str] = Field(default_factory=list)
     id_col: str = Field(default="YAZAKI PN")
     master_sheet_name: Optional[str] = None
     status_sheet_name: Optional[str] = None

@@ -154,6 +154,7 @@
         window.FASTAPI_URL = '{{ fastapi_url }}';
         console.log('Template set FASTAPI_URL to:', window.FASTAPI_URL);
     </script>
+    <script src="{{ url_for('static', filename='js/datecols.js') }}?v={{ range(1000, 9999) | random }}"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}?v={{ range(1000, 9999) | random }}"></script>
     {% block scripts %}{% endblock %}
 </body>

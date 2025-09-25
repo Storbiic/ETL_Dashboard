@@ -277,17 +277,15 @@ function detectDateColumns() {
         .filter(col => col.dtype === 'date' || col.name.toLowerCase().includes('date'))
         .map(col => col.name);
     
-    const container = document.getElementById('detected-dates');
+    // Filter out excluded date columns
+    const filteredDateColumns = dateColumns.filter(col => !EXCLUDED_DATE_COLUMNS.includes(col));
     
-    if (dateColumns.length > 0) {
-        container.innerHTML = dateColumns.map(col => 
-            `<span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">${escapeHtml(col)}</span>`
-        ).join('');
-        
+    // Update UI with filtered columns
+    updateDetectedDatesDisplay(filteredDateColumns);
+    
+    if (filteredDateColumns.length > 0) {
         // Auto-populate date columns input
-        document.getElementById('date-columns').value = dateColumns.join(', ');
-    } else {
-        container.innerHTML = '<span class="text-sm text-gray-500">No date columns detected</span>';
+        document.getElementById('date-columns').value = filteredDateColumns.join(', ');
     }
 }
 

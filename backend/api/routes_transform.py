@@ -141,6 +141,12 @@ async def transform_data(request: TransformRequest):
             # Auto-detect additional date columns
             etl_logger.info("Auto-detecting additional date columns")
             auto_date_cols = detect_date_columns(master_df)
+            
+            # Filter out excluded date columns
+            if request.options.excluded_date_cols:
+                etl_logger.info("Excluding specified date columns", excluded=request.options.excluded_date_cols)
+                auto_date_cols = [col for col in auto_date_cols if col not in request.options.excluded_date_cols]
+            
             etl_logger.info("Auto-detected date columns", detected_cols=auto_date_cols)
 
             for col in auto_date_cols:
