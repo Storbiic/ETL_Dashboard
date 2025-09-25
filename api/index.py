@@ -90,7 +90,6 @@ class handler(BaseHTTPRequestHandler):
                         <span class="text-sm font-medium text-gray-700" id="current-step-name">Step 1: Upload Excel Workbook</span>
                         <div class="flex items-center space-x-4">
                             <span class="text-sm text-gray-500" id="step-percentage">0% Complete</span>
-                            <span class="text-sm text-gray-500" id="elapsed-time">00:00</span>
                         </div>
                     </div>
                     <div class="w-full bg-gray-200 rounded-full h-3">
@@ -241,18 +240,7 @@ class handler(BaseHTTPRequestHandler):
         // Use current origin for API calls to avoid CORS issues
         const API_BASE_URL = window.location.origin;
         let currentStep = 1;
-        let startTime = Date.now();
         let fileId = null;
-
-        // Timer functionality
-        function updateTimer() {{
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
-            const minutes = Math.floor(elapsed / 60);
-            const seconds = elapsed % 60;
-            document.getElementById('elapsed-time').textContent = 
-                `${{minutes.toString().padStart(2, '0')}}:${{seconds.toString().padStart(2, '0')}}`;
-        }}
-        setInterval(updateTimer, 1000);
 
         // File upload handling
         document.getElementById('fileInput').addEventListener('change', function(e) {{
