@@ -124,3 +124,34 @@ dmypy.json
 
 # pytype static type analyzer
 .pytype/
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Project specific - Data directories (keep structure, ignore contents)
+data/uploads/*
+!data/uploads/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/pipeline_output/*
+!data/pipeline_output/.gitkeep
+
+# Temporary files
+*.tmp
+*.temp
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment files (keep examples only)
+.env.local
+.env.development
+.env.test
