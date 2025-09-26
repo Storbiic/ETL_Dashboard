@@ -3,15 +3,12 @@
   "version": "1.0.0",
   "description": "ETL Dashboard for Excel processing with Power BI outputs",
   "scripts": {
-    "dev": "vercel dev",
+    "dev": "python run_dev.py",
     "build": "echo 'Build completed'",
-    "deploy": "vercel",
-    "deploy-prod": "vercel --prod"
+    "start": "python run_dev.py"
   },
   "dependencies": {},
-  "devDependencies": {
-    "vercel": "^32.0.0"
-  },
+  "devDependencies": {},
   "engines": {
     "node": ">=18.0.0"
   },

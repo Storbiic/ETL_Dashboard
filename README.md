@@ -82,22 +82,11 @@ FLASK_APP=frontend.app flask run --host 127.0.0.1 --port 5000
 docker-compose up --build
 ```
 
-#### Option 4: Vercel Deployment
-The application is also deployed on Vercel with serverless functions:
-```bash
-# Deploy to production
-vercel --prod
-
-# Deploy to preview
-vercel
-```
-
 ### Access the Application
 
 - **Local Frontend**: http://localhost:5000
 - **Local Backend API**: http://localhost:8000  
 - **Local API Documentation**: http://localhost:8000/docs
-- **Vercel Production**: https://etl-dashboard-1l8f7caj4-storbiics-projects.vercel.app
 
 ## Usage
 

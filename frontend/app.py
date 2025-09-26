@@ -15,15 +15,10 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key')
 
 # Configuration for different deployment environments
 class Config:
-    # For Render deployment, backend runs on same container
-    if os.getenv('RENDER'):
-        FASTAPI_BASE_URL = os.getenv('BACKEND_URL', 'http://localhost:8000')
-        FASTAPI_BROWSER_URL = FASTAPI_BASE_URL  # Same for Render
-    else:
-        # For Docker, internal communication uses service name
-        FASTAPI_BASE_URL = f"http://{os.getenv('FASTAPI_HOST', '127.0.0.1')}:{os.getenv('FASTAPI_PORT', '8000')}"
-        # For browser, always use localhost (Docker port mapping)
-        FASTAPI_BROWSER_URL = f"http://localhost:{os.getenv('FASTAPI_PORT', '8000')}"
+    # For Docker, internal communication uses service name
+    FASTAPI_BASE_URL = f"http://{os.getenv('FASTAPI_HOST', '127.0.0.1')}:{os.getenv('FASTAPI_PORT', '8000')}"
+    # For browser, always use localhost (Docker port mapping)
+    FASTAPI_BROWSER_URL = f"http://localhost:{os.getenv('FASTAPI_PORT', '8000')}"
     
     PORT = int(os.getenv('PORT', 5000))
     DEBUG = os.getenv('FLASK_DEBUG', 'false').lower() == 'true'
