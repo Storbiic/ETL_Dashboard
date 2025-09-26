@@ -1,0 +1,57 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/*.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "frontend/static/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/health",
+      "dest": "/api/health.py"
+    },
+    {
+      "src": "/api/upload",
+      "methods": ["POST"],
+      "dest": "/api/upload.py"
+    },
+    {
+      "src": "/api/preview",
+      "methods": ["POST"],
+      "dest": "/api/preview.py"
+    },
+    {
+      "src": "/api/profile",
+      "methods": ["POST"],
+      "dest": "/api/profile.py"
+    },
+    {
+      "src": "/api/transform",
+      "methods": ["POST"],
+      "dest": "/api/transform.py"
+    },
+    {
+      "src": "/api/files/(.*)",
+      "dest": "/api/files.py"
+    },
+    {
+      "src": "/static/(.*)",
+      "dest": "/frontend/static/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.py"
+    }
+  ],
+  "env": {
+    "PYTHONPATH": "/var/task:/var/task/backend",
+    "UPLOAD_FOLDER": "/tmp/uploads",
+    "PROCESSED_FOLDER": "/tmp/processed",
+    "PIPELINE_OUTPUT_FOLDER": "/tmp/pipeline_output"
+  }
+}

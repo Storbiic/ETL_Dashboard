@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETL Dashboard - Test Version</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* Custom styles for ETL Dashboard */
+        
+        /* Loading animations */
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+            border-radius: 50%;
+            border: 2px solid #e5e7eb;
+            border-top-color: #2563eb;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* File upload area */
+        .upload-area {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .upload-area:hover {
+            border-color: #60a5fa !important;
+            background-color: #eff6ff !important;
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .upload-area:hover i {
+            color: #3b82f6 !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <a href="/" class="flex items-center">
+                        <i class="fas fa-database text-blue-600 text-2xl mr-3"></i>
+                        <span class="text-xl font-semibold text-gray-900">ETL Dashboard - Test Version</span>
+                    </a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-green-600 font-medium">✅ Styling Working!</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="space-y-8">
+            <!-- Header -->
+            <div class="text-center">
+                <h1 class="text-3xl font-bold text-gray-900">Excel ETL Dashboard</h1>
+                <p class="mt-2 text-lg text-gray-600">Upload, analyze, and transform Excel workbooks into Power BI-ready data</p>
+                <div class="mt-4 p-4 bg-green-100 border border-green-400 rounded-lg">
+                    <p class="text-green-800">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        If you can see this styled properly with colors, shadows, and fonts, then Tailwind CSS and custom styling are working!
+                    </p>
+                </div>
+            </div>
+
+            <!-- Test Upload Area -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">
+                    <i class="fas fa-upload mr-2 text-blue-600"></i>
+                    Test Upload Area - Hover Me!
+                </h2>
+
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-all duration-300 upload-area">
+                    <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4 transition-colors"></i>
+                    <p class="text-lg font-medium text-gray-900 mb-2">This should have hover effects and styling!</p>
+                    <p class="text-sm text-gray-500">Hover over this area to test the enhanced styling</p>
+                </div>
+            </div>
+
+            <!-- Test Buttons -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-semibold text-gray-900 mb-4">Test Styled Elements</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <h3 class="font-semibold text-blue-900">Blue Card</h3>
+                        <p class="text-blue-700">This should be blue styled</p>
+                    </div>
+                    <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <h3 class="font-semibold text-green-900">Green Card</h3>
+                        <p class="text-green-700">This should be green styled</p>
+                    </div>
+                    <div class="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                        <h3 class="font-semibold text-purple-900">Purple Card</h3>
+                        <p class="text-purple-700">This should be purple styled</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log('✅ JavaScript loaded successfully');
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('✅ DOM loaded - styling should be applied');
+            
+            // Test if Tailwind classes are working
+            const testElement = document.querySelector('.bg-gray-50');
+            if (testElement) {
+                console.log('✅ Tailwind CSS classes detected');
+            } else {
+                console.log('❌ Tailwind CSS classes NOT detected');
+            }
+        });
+    </script>
+</body>
+</html>

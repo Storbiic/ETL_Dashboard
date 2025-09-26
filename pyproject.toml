@@ -1,0 +1,177 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "etl-dashboard"
+description = "Advanced ETL Dashboard for data processing and visualization"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+    {name = "Saad", email = "saad@example.com"}
+]
+keywords = ["etl", "dashboard", "data-processing", "fastapi", "flask"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Framework :: FastAPI",
+    "Framework :: Flask",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+]
+requires-python = ">=3.9"
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/Storbiic/ETL_Dashboard"
+Repository = "https://github.com/Storbiic/ETL_Dashboard"
+Documentation = "https://github.com/Storbiic/ETL_Dashboard#readme"
+"Bug Tracker" = "https://github.com/Storbiic/ETL_Dashboard/issues"
+
+# Black configuration
+[tool.black]
+line-length = 88
+target-version = ['py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | __pycache__
+)/
+'''
+
+# isort configuration
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["backend", "frontend"]
+known_third_party = ["fastapi", "flask", "pandas", "numpy"]
+skip_glob = ["**/migrations/*", "**/__pycache__/*"]
+
+# MyPy configuration
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+disallow_untyped_decorators = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "pandas.*",
+    "numpy.*",
+    "openpyxl.*",
+    "sqlalchemy.*",
+    "uvicorn.*"
+]
+ignore_missing_imports = true
+
+# Pytest configuration
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = """
+    -ra 
+    -q 
+    --strict-markers 
+    --strict-config
+    --cov=backend
+    --cov=frontend
+    --cov-branch
+    --cov-report=term-missing
+    --cov-report=html:htmlcov
+    --cov-report=xml
+"""
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "benchmark: marks tests as performance benchmarks",
+    "api: marks tests as API tests",
+    "frontend: marks tests as frontend tests",
+    "backend: marks tests as backend tests"
+]
+filterwarnings = [
+    "error",
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning"
+]
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["backend", "frontend"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/migrations/*",
+    "*/venv/*",
+    "*/env/*",
+    "setup.py",
+    "conftest.py"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
+ignore_errors = true
+show_missing = true
+precision = 2
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+# Bandit configuration
+[tool.bandit]
+exclude_dirs = ["tests", "*/tests/*", "*/test_*"]
+skips = ["B101", "B601"]
+
+# setuptools configuration
+[tool.setuptools]
+packages = ["backend", "frontend"]
+
+[tool.setuptools.dynamic]
+version = {attr = "backend.__version__"}
+
+[tool.setuptools.package-data]
+backend = ["py.typed"]
+frontend = ["static/**/*", "templates/**/*"]

@@ -7,11 +7,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from backend.api import routes_upload, routes_preview, routes_profile, routes_transform
+from backend.api import routes_preview, routes_profile, routes_transform, routes_upload
 from backend.core.config import settings
 from backend.core.logging import logger
-from backend.models.schemas import HealthResponse, ErrorResponse
-
+from backend.models.schemas import ErrorResponse, HealthResponse
 
 # Create FastAPI application
 app = FastAPI(
@@ -19,7 +18,7 @@ app = FastAPI(
     description="FastAPI backend for Excel ETL processing with Power BI outputs",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
 )
 
 # Add CORS middleware
@@ -40,18 +39,17 @@ async def global_exception_handler(request, exc):
         status_code=500,
         content=ErrorResponse(
             error="Internal server error",
-            detail=str(exc) if settings.fastapi_reload else "An unexpected error occurred"
-        ).dict()
+            detail=(
+                str(exc) if settings.fastapi_reload else "An unexpected error occurred"
+            ),
+        ).dict(),
     )
 
 
 @app.get("/", response_model=HealthResponse)
 async def root():
     """Root endpoint with basic health check."""
-    return HealthResponse(
-        status="healthy",
-        timestamp=datetime.now()
-    )
+    return HealthResponse(status="healthy", timestamp=datetime.now())
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -60,64 +58,43 @@ async def health_check():
     # Check if required directories exist
     upload_dir = Path(settings.upload_folder)
     processed_dir = Path(settings.processed_folder)
-    
+
     if not upload_dir.exists():
         raise HTTPException(
-            status_code=503,
-            detail=f"Upload directory not found: {upload_dir}"
+            status_code=503, detail=f"Upload directory not found: {upload_dir}"
         )
-    
+
     if not processed_dir.exists():
         raise HTTPException(
-            status_code=503,
-            detail=f"Processed directory not found: {processed_dir}"
+            status_code=503, detail=f"Processed directory not found: {processed_dir}"
         )
-    
-    return HealthResponse(
-        status="healthy",
-        timestamp=datetime.now()
-    )
+
+    return HealthResponse(status="healthy", timestamp=datetime.now())
 
 
 # Include API routers
-app.include_router(
-    routes_upload.router,
-    prefix="/api",
-    tags=["upload"]
-)
+app.include_router(routes_upload.router, prefix="/api", tags=["upload"])
 
-app.include_router(
-    routes_preview.router,
-    prefix="/api",
-    tags=["preview"]
-)
+app.include_router(routes_preview.router, prefix="/api", tags=["preview"])
 
-app.include_router(
-    routes_profile.router,
-    prefix="/api",
-    tags=["profile"]
-)
+app.include_router(routes_profile.router, prefix="/api", tags=["profile"])
 
-app.include_router(
-    routes_transform.router,
-    prefix="/api",
-    tags=["transform"]
-)
+app.include_router(routes_transform.router, prefix="/api", tags=["transform"])
 
 
 @app.get("/api/logs/recent")
 async def get_recent_logs():
     """Get recent log entries for monitoring."""
-    import os
     import json
+    import os
     from datetime import datetime
 
     try:
         logs = []
-        log_file = os.path.join(os.path.dirname(__file__), '..', 'logs', 'etl.log')
+        log_file = os.path.join(os.path.dirname(__file__), "..", "logs", "etl.log")
 
         if os.path.exists(log_file):
-            with open(log_file, 'r') as f:
+            with open(log_file, "r") as f:
                 lines = f.readlines()
                 # Get last 50 lines
                 recent_lines = lines[-50:] if len(lines) > 50 else lines
@@ -130,11 +107,13 @@ async def get_recent_logs():
                             logs.append(log_data)
                         except json.JSONDecodeError:
                             # Plain text log
-                            logs.append({
-                                'message': line.strip(),
-                                'timestamp': datetime.now().isoformat(),
-                                'level': 'info'
-                            })
+                            logs.append(
+                                {
+                                    "message": line.strip(),
+                                    "timestamp": datetime.now().isoformat(),
+                                    "level": "info",
+                                }
+                            )
 
         return {"logs": logs, "count": len(logs)}
 
@@ -145,13 +124,13 @@ async def get_recent_logs():
 @app.get("/api/progress/status")
 async def get_progress_status():
     """Get current ETL progress status."""
-    import os
     import json
+    import os
     from datetime import datetime, timedelta
 
     try:
         # Read recent logs to determine current status
-        log_file = os.path.join(os.path.dirname(__file__), '..', 'logs', 'etl.log')
+        log_file = os.path.join(os.path.dirname(__file__), "..", "logs", "etl.log")
 
         if not os.path.exists(log_file):
             return {
@@ -159,14 +138,14 @@ async def get_progress_status():
                 "status": "idle",
                 "operation": "System Ready",
                 "description": "Waiting for ETL operations...",
-                "last_activity": None
+                "last_activity": None,
             }
 
         # Get recent logs (last 5 minutes)
         recent_logs = []
         cutoff_time = datetime.now() - timedelta(minutes=5)
 
-        with open(log_file, 'r') as f:
+        with open(log_file, "r") as f:
             lines = f.readlines()
             recent_lines = lines[-20:] if len(lines) > 20 else lines
 
@@ -174,7 +153,9 @@ async def get_progress_status():
                 if line.strip():
                     try:
                         log_data = json.loads(line.strip())
-                        log_time = datetime.fromisoformat(log_data.get('timestamp', '').replace('Z', '+00:00'))
+                        log_time = datetime.fromisoformat(
+                            log_data.get("timestamp", "").replace("Z", "+00:00")
+                        )
                         if log_time > cutoff_time:
                             recent_logs.append(log_data)
                     except (json.JSONDecodeError, ValueError):
@@ -189,52 +170,67 @@ async def get_progress_status():
 
         if recent_logs:
             latest_log = recent_logs[-1]
-            last_activity = latest_log.get('timestamp')
+            last_activity = latest_log.get("timestamp")
 
             # Check for errors
-            has_error = any((log.get('level') or log.get('severity') or '').upper() == 'ERROR' for log in recent_logs)
+            has_error = any(
+                (log.get("level") or log.get("severity") or "").upper() == "ERROR"
+                for log in recent_logs
+            )
 
             if has_error:
                 status = "error"
                 operation = "Error Occurred"
-                description = "An error occurred during processing. Check logs for details."
+                description = (
+                    "An error occurred during processing. Check logs for details."
+                )
                 progress = 0
             else:
                 # Determine progress based on recent log messages
                 for log in reversed(recent_logs):
-                    message = (log.get('message') or log.get('event') or '').lower()
+                    message = (log.get("message") or log.get("event") or "").lower()
 
-                    if 'file uploaded' in message:
+                    if "file uploaded" in message:
                         progress = 10
                         status = "upload"
                         operation = "File Upload"
                         description = "Excel file uploaded successfully"
                         break
-                    elif 'reading excel' in message or ('found' in message and 'sheets' in message):
+                    elif "reading excel" in message or (
+                        "found" in message and "sheets" in message
+                    ):
                         progress = 20
                         status = "reading"
                         operation = "Reading Sheets"
                         description = "Loading Excel sheets..."
                         break
-                    elif 'masterbom processing' in message or 'processing masterbom' in message:
+                    elif (
+                        "masterbom processing" in message
+                        or "processing masterbom" in message
+                    ):
                         progress = 40
                         status = "masterbom_processing"
                         operation = "Processing MasterBOM"
                         description = "Cleaning and transforming master data..."
                         break
-                    elif 'status sheet processing' in message or 'processing status' in message:
+                    elif (
+                        "status sheet processing" in message
+                        or "processing status" in message
+                    ):
                         progress = 70
                         status = "status_processing"
                         operation = "Processing Status"
                         description = "Processing status sheet data..."
                         break
-                    elif 'etl transformation' in message:
+                    elif "etl transformation" in message:
                         progress = 85
                         status = "transformation"
                         operation = "ETL Transformation"
                         description = "Applying business rules and transformations..."
                         break
-                    elif 'complete' in message and ('processing' in message or 'transformation' in message):
+                    elif "complete" in message and (
+                        "processing" in message or "transformation" in message
+                    ):
                         progress = 100
                         status = "complete"
                         operation = "Complete"
@@ -247,7 +243,7 @@ async def get_progress_status():
             "operation": operation,
             "description": description,
             "last_activity": last_activity,
-            "recent_logs_count": len(recent_logs)
+            "recent_logs_count": len(recent_logs),
         }
 
     except Exception as e:
@@ -256,7 +252,7 @@ async def get_progress_status():
             "status": "error",
             "operation": "System Error",
             "description": f"Failed to get progress status: {str(e)}",
-            "last_activity": None
+            "last_activity": None,
         }
 
 
@@ -264,11 +260,11 @@ async def get_progress_status():
 async def startup_event():
     """Application startup event."""
     logger.info("Starting ETL Dashboard API", version="1.0.0")
-    
+
     # Ensure required directories exist
     settings.upload_folder_path.mkdir(parents=True, exist_ok=True)
     settings.processed_folder_path.mkdir(parents=True, exist_ok=True)
-    
+
     logger.info("ETL Dashboard API started successfully")
 
 
@@ -280,11 +276,11 @@ async def shutdown_event():
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     uvicorn.run(
         "backend.main:app",
         host=settings.fastapi_host,
         port=settings.fastapi_port,
         reload=settings.fastapi_reload,
-        log_level=settings.log_level.lower()
+        log_level=settings.log_level.lower(),
     )

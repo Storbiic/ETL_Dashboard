@@ -1,0 +1,28 @@
+{
+  "name": "etl-dashboard",
+  "version": "1.0.0",
+  "description": "ETL Dashboard for Excel processing with Power BI outputs",
+  "scripts": {
+    "dev": "python run_dev.py",
+    "build": "echo 'Build completed'",
+    "start": "python run_dev.py"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Storbiic/ETL_Dashboard.git"
+  },
+  "author": "Your Name",
+  "license": "MIT",
+  "keywords": [
+    "etl",
+    "dashboard",
+    "excel",
+    "powerbi",
+    "data-processing"
+  ]
+}

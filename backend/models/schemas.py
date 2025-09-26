@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 class UploadResponse(BaseModel):
     """Response model for file upload."""
+
     file_id: str
     filename: str
     sheet_names: List[str]
@@ -17,6 +18,7 @@ class UploadResponse(BaseModel):
 
 class PreviewRequest(BaseModel):
     """Request model for sheet preview."""
+
     file_id: str
     sheet: str
     n: int = Field(default=10, ge=1, le=100)
@@ -24,6 +26,7 @@ class PreviewRequest(BaseModel):
 
 class PreviewResponse(BaseModel):
     """Response model for sheet preview."""
+
     sheet_name: str
     total_rows: int
     total_cols: int
@@ -34,12 +37,14 @@ class PreviewResponse(BaseModel):
 
 class ProfileRequest(BaseModel):
     """Request model for data profiling."""
+
     file_id: str
     sheet: str
 
 
 class ColumnProfile(BaseModel):
     """Profile information for a single column."""
+
     name: str
     dtype: str
     non_null_count: int
@@ -51,6 +56,7 @@ class ColumnProfile(BaseModel):
 
 class ProfileResponse(BaseModel):
     """Response model for data profiling."""
+
     sheet_name: str
     total_rows: int
     total_cols: int
@@ -60,6 +66,7 @@ class ProfileResponse(BaseModel):
 
 class TransformOptions(BaseModel):
     """Options for ETL transformation."""
+
     date_cols: List[str] = Field(default_factory=list)
     excluded_date_cols: List[str] = Field(default_factory=list)
     id_col: str = Field(default="YAZAKI PN")
@@ -69,6 +76,7 @@ class TransformOptions(BaseModel):
 
 class TransformRequest(BaseModel):
     """Request model for ETL transformation."""
+
     file_id: str
     master_sheet: str
     status_sheet: str
@@ -77,6 +85,7 @@ class TransformRequest(BaseModel):
 
 class ArtifactInfo(BaseModel):
     """Information about generated artifacts."""
+
     name: str
     path: str
     format: str
@@ -86,6 +95,7 @@ class ArtifactInfo(BaseModel):
 
 class TransformSummary(BaseModel):
     """Summary statistics from ETL transformation."""
+
     total_parts: int
     active_parts: int
     inactive_parts: int
@@ -99,6 +109,7 @@ class TransformSummary(BaseModel):
 
 class TransformResponse(BaseModel):
     """Response model for ETL transformation."""
+
     success: bool
     artifacts: List[ArtifactInfo]
     summary: TransformSummary
@@ -108,6 +119,7 @@ class TransformResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     """Standard error response model."""
+
     error: str
     detail: Optional[str] = None
     code: Optional[str] = None
@@ -115,6 +127,7 @@ class ErrorResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     """Health check response."""
+
     status: str
     timestamp: datetime
     version: str = "1.0.0"
@@ -123,6 +136,7 @@ class HealthResponse(BaseModel):
 # Status classification for parts
 class PartStatus(BaseModel):
     """Part status information."""
+
     part_id_std: str
     part_id_raw: str
     project_plant: str
@@ -135,6 +149,7 @@ class PartStatus(BaseModel):
 
 class PlantStats(BaseModel):
     """Statistics for a plant/project."""
+
     plant_name: str
     n_active: int
     n_inactive: int
