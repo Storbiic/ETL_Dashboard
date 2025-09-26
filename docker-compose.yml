@@ -31,10 +31,10 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
     ports:
-      - "5000:5000"
+      - "3000:3000"
     environment:
       - FLASK_HOST=0.0.0.0
-      - FLASK_PORT=5000
+      - FLASK_PORT=3000
       - FLASK_DEBUG=true
       - FASTAPI_HOST=backend
       - FASTAPI_PORT=8000
