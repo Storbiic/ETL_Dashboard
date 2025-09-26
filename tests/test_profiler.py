@@ -258,8 +258,9 @@ class TestDataProfiler:
         assert len(result.columns) == 2
 
         # Check that error column has error type
-        prob_col = next(col for col in result.columns if col.name == "problematic_col")
+        prob_cols = [col for col in result.columns if col.name == "problematic_col"]
         # Should handle gracefully, possibly as "error" type or convert to string
+        assert prob_cols  # Ensure the column exists
 
 
 class TestProfilerEdgeCases:

@@ -1,15 +1,12 @@
 """Integration tests for the complete API workflow."""
 
 import asyncio
-import tempfile
-from pathlib import Path
 
 import pandas as pd
 import pytest
 from httpx import AsyncClient
 from openpyxl import Workbook
 
-from backend.core.config import settings
 from backend.main import app
 
 
@@ -339,7 +336,10 @@ class TestAPIIntegration:
                     "file": (
                         "test_workbook.xlsx",
                         f,
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        (
+                            "application/vnd.openxmlformats-"
+                            "officedocument.spreadsheetml.sheet"
+                        ),
                     )
                 }
                 upload_response = await client.post("/api/upload", files=files)
@@ -497,7 +497,7 @@ class TestPerformance:
 
         large_df = generate_large_masterbom(n_parts=10000, n_projects=10)
         processor = MasterBOMProcessor(large_df, ETLLogger())
-        result = processor.process(id_col="YAZAKI PN")
+        processor.process(id_col="YAZAKI PN")
 
         peak_memory = process.memory_info().rss
         memory_increase = peak_memory - initial_memory

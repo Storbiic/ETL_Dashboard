@@ -1,9 +1,6 @@
 """Tests for data cleaning utilities."""
 
-from datetime import date, datetime
-
 import pandas as pd
-import pytest
 
 from backend.services.cleaning import (
     clean_id,

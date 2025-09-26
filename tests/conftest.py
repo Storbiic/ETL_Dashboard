@@ -295,7 +295,7 @@ def assert_dataframe_equal(df1, df2, check_dtype=True, check_index=True):
         )
     except AssertionError as e:
         # Add more context to the error
-        print(f"DataFrame comparison failed:")
+        print("DataFrame comparison failed:")
         print(f"Left shape: {df1.shape}, Right shape: {df2.shape}")
         print(f"Left columns: {list(df1.columns)}")
         print(f"Right columns: {list(df2.columns)}")

@@ -233,7 +233,7 @@ class TestMasterBOMProcessor:
         if "psw_ok" in result.columns:
             # Parts with PSW = "OK" should have psw_ok = True
             ok_parts = result[result["PSW"] == "OK"]
-            assert all(ok_parts["psw_ok"] == True)
+            assert all(ok_parts["psw_ok"] is True)
 
     def test_finalize_masterbom(self, sample_masterbom_data, mock_logger):
         """Test MasterBOM finalization."""

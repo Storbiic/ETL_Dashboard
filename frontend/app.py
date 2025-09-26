@@ -280,7 +280,7 @@ def download_powerbi_package(file_id):
                             dax_generator = DAXGenerator()
                             dax_file_path = dax_generator.generate_dax_file(temp_dir)
                             zipf.write(
-                                dax_file_path, f"DATA_BI/ETL_Dashboard_Measures.dax"
+                                dax_file_path, "DATA_BI/ETL_Dashboard_Measures.dax"
                             )
                             print("Added DAX measures file to zip")
                     except Exception as dax_error:
@@ -579,7 +579,7 @@ def api_transform():
         # Get JSON data from request
         transform_data = request.get_json()
 
-        print(f"🔧 Transform request received:")
+        print("🔧 Transform request received:")
         print(f"   File ID: {transform_data.get('file_id', 'N/A')}")
         print(f"   Master Sheet: {transform_data.get('master_sheet', 'N/A')}")
         print(f"   Status Sheet: {transform_data.get('status_sheet', 'N/A')}")
