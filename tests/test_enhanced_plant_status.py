@@ -1,4 +1,4 @@
-"""Tests for enhanced plant_item_status processing with Morocco supplier 
+"""Tests for enhanced plant_item_status processing with Morocco supplier
 prioritization.
 """
 

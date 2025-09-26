@@ -1,13 +1,6 @@
 # ETL Dashboard
 
-[![CI/CD Pipeline](https://github.com/Storbiic/ETL_Dashboard/actions/workflows/python-app.yml/badge.svg)](https://github.com/Storbiic/ETL_Dashboard/actions/workflows/python-app.yml)
-[![codecov](https://codecov.io/gh/Storbiic/ETL_Dashboard/branch/main/graph/badge.svg)](https://codecov.io/gh/Storbiic/ETL_Dashboard)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
-
-A professional FastAPI + Flask application for auditable ETL processing of Excel workbooks, producing Power BI-ready outputs with comprehensive CI/CD pipeline and code quality assurance.
+A FastAPI + Flask application for auditable ETL processing of Excel workbooks, producing Power BI-ready outputs.
 
 ## Features
 
@@ -144,8 +137,7 @@ pytest tests/ -v -m "not slow"
 
 ### Code Quality & Testing
 
-This project uses comprehensive code quality tools:
-
+Format and lint code:
 ```bash
 # Format code with Black
 black backend/ frontend/ tests/
@@ -159,23 +151,8 @@ flake8 backend/ frontend/ tests/ --max-line-length=88
 # Type check with mypy
 mypy backend/ --ignore-missing-imports
 
-# Security scanning
-bandit -r backend/
-safety check
-
-# Run all tests with coverage
-pytest tests/ --cov=backend --cov=frontend --cov-report=html
-```
-
-### Pre-commit Hooks
-
-Install pre-commit hooks to ensure code quality:
-
-```bash
-# Make the pre-commit hook executable (Linux/Mac)
-chmod +x .git/hooks/pre-commit
-
-# On Windows, the hook will run automatically
+# Run tests
+pytest tests/
 ```
 
 ### Development Workflow
@@ -200,36 +177,12 @@ pytest -m "not slow"
 ```bash
 # Build and run with Docker Compose
 docker-compose up --build
-
-# Run tests in Docker
-docker-compose -f docker-compose.test.yml up --build
 ```
-
-## CI/CD Pipeline
-
-This project uses GitHub Actions for continuous integration and deployment:
-
-- **Code Quality**: Black formatting, isort, flake8, mypy, bandit security checks
-- **Testing**: Multi-version Python testing (3.9, 3.10, 3.11, 3.12) with pytest
-- **Docker**: Multi-stage Docker builds and docker-compose validation
-- **Integration**: Full application testing with database services
-- **Security**: Trivy vulnerability scanning and dependency checking
-- **Performance**: Benchmark testing and performance monitoring
-- **Deployment**: Automated staging deployment on main branch pushes
-
-### Branch Protection
-
-- `main` branch requires all CI checks to pass
-- Pull requests must have passing tests and code review
-- Direct pushes to `main` are restricted
 
 ## Project Structure
 
 ```
 ETL_Dashboard/
-├── .github/
-│   └── workflows/
-│       └── python-app.yml      # CI/CD pipeline
 ├── backend/                    # FastAPI application
 │   ├── api/                   # API routes
 │   ├── core/                  # Configuration & logging
@@ -246,13 +199,7 @@ ETL_Dashboard/
 ├── powerbi/                 # Power BI assets
 ├── docker-compose.yml       # Development setup
 ├── docker-compose.prod.yml  # Production setup
-├── docker-compose.test.yml  # Testing setup
 ├── pyproject.toml          # Python project configuration
 ├── requirements.txt        # Python dependencies
 └── README.md              # This file
-├── frontend/          # Flask application  
-├── data/             # Upload and processed data
-├── powerbi/          # Power BI integration files
-├── tests/            # Test suite
-└── requirements.txt  # Dependencies
 ```
