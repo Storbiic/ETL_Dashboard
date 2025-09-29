@@ -18,7 +18,7 @@ class DataStorage:
     def __init__(self, logger: ETLLogger):
         """Initialize with logger."""
         self.logger = logger
-        self.processed_folder = Path(settings.processed_folder)
+        self.processed_folder = settings.processed_folder_path
         self.processed_folder.mkdir(parents=True, exist_ok=True)
 
     def save_all_formats(

@@ -18,13 +18,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY frontend/ ./frontend/
 COPY backend/ ./backend/
 
-# Copy environment configuration and initialization script
-COPY .env.production .env
-COPY docker-init.sh /app/docker-init.sh
-RUN chmod +x /app/docker-init.sh
+# Create and set permissions for data directories
+RUN mkdir -p /app/data/uploads \
+             /app/data/processed \
+             /app/data/pipeline_output && \
+    chmod -R 777 /app/data && \
+    touch /app/data/processed/.keep \
+         /app/data/pipeline_output/.keep
 
-# Initialize directories with proper cross-platform setup
-RUN /app/docker-init.sh
+# Copy environment configuration
+COPY .env.production .env
 
 # Expose port
 EXPOSE 3000

@@ -56,8 +56,8 @@ async def root():
 async def health_check():
     """Detailed health check endpoint."""
     # Check if required directories exist
-    upload_dir = Path(settings.upload_folder)
-    processed_dir = Path(settings.processed_folder)
+    upload_dir = settings.upload_folder_path
+    processed_dir = settings.processed_folder_path
 
     if not upload_dir.exists():
         raise HTTPException(
@@ -70,6 +70,27 @@ async def health_check():
         )
 
     return HealthResponse(status="healthy", timestamp=datetime.now())
+
+
+@app.get("/api/debug/paths")
+async def debug_paths():
+    """Debug endpoint to check path configuration."""
+    return {
+        "upload_folder": str(settings.upload_folder_path),
+        "processed_folder": str(settings.processed_folder_path), 
+        "pipeline_output_folder": str(settings.pipeline_output_folder_path),
+        "paths_exist": {
+            "upload": settings.upload_folder_path.exists(),
+            "processed": settings.processed_folder_path.exists(),
+            "pipeline_output": settings.pipeline_output_folder_path.exists(),
+        },
+        "environment_vars": {
+            "UPLOAD_FOLDER": settings.upload_folder,
+            "PROCESSED_FOLDER": settings.processed_folder,
+            "PIPELINE_OUTPUT_FOLDER": settings.pipeline_output_folder,
+        },
+        "working_directory": str(Path.cwd()),
+    }
 
 
 # Include API routers
