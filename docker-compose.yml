@@ -12,10 +12,18 @@ services:
       - LOG_LEVEL=DEBUG
       - UPLOAD_FOLDER=/app/data/uploads
       - PROCESSED_FOLDER=/app/data/processed
+      - PIPELINE_OUTPUT_FOLDER=/app/data/pipeline_output
     volumes:
-      - ./data:/app/data
-      - ./backend:/app/backend
-      - ./powerbi:/app/powerbi
+      # Use consistent volume mounting across platforms
+      - type: bind
+        source: ./data
+        target: /app/data
+      - type: bind
+        source: ./backend
+        target: /app/backend
+      - type: bind
+        source: ./powerbi
+        target: /app/powerbi
     networks:
       - etl-network
     restart: unless-stopped
@@ -38,11 +46,22 @@ services:
       - FLASK_DEBUG=true
       - FASTAPI_HOST=backend
       - FASTAPI_PORT=8000
+      - PROCESSED_FOLDER=/app/data/processed
+      - PIPELINE_OUTPUT_FOLDER=/app/data/pipeline_output
     volumes:
-      - ./data:/app/data
-      - ./frontend:/app/frontend
-      - ./backend:/app/backend
-      - ./powerbi:/app/powerbi
+      # Use consistent volume mounting across platforms
+      - type: bind
+        source: ./data
+        target: /app/data
+      - type: bind
+        source: ./frontend
+        target: /app/frontend
+      - type: bind
+        source: ./backend
+        target: /app/backend
+      - type: bind
+        source: ./powerbi
+        target: /app/powerbi
     depends_on:
       - backend
     networks:

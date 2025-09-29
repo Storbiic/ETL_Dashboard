@@ -31,14 +31,112 @@ FASTAPI_BROWSER_URL = Config.FASTAPI_BROWSER_URL
 
 # Get the project root directory (parent of frontend directory)
 PROJECT_ROOT = Path(__file__).parent.parent
-PROCESSED_FOLDER = PROJECT_ROOT / os.getenv("PROCESSED_FOLDER", "data/processed")
-PIPELINE_OUTPUT_FOLDER = PROJECT_ROOT / os.getenv(
-    "PIPELINE_OUTPUT_FOLDER", "data/pipeline_output"
-)
+
+# Use Docker environment variables if available, otherwise fall back to local paths
+if os.getenv("PROCESSED_FOLDER") and os.getenv("PROCESSED_FOLDER").startswith("/app/"):
+    # Running in Docker - use absolute paths from environment
+    PROCESSED_FOLDER = Path(os.getenv("PROCESSED_FOLDER", "/app/data/processed"))
+    PIPELINE_OUTPUT_FOLDER = Path(os.getenv("PIPELINE_OUTPUT_FOLDER", "/app/data/pipeline_output"))
+else:
+    # Running locally - use relative paths
+    PROCESSED_FOLDER = PROJECT_ROOT / os.getenv("PROCESSED_FOLDER", "data/processed")
+    PIPELINE_OUTPUT_FOLDER = PROJECT_ROOT / os.getenv(
+        "PIPELINE_OUTPUT_FOLDER", "data/pipeline_output"
+    )
+
+
+def ensure_directory_exists(directory_path):
+    """Ensure directory exists with proper cross-platform handling."""
+    try:
+        directory_path = Path(directory_path)
+        directory_path.mkdir(parents=True, exist_ok=True)
+        return True
+    except Exception as e:
+        print(f"Error creating directory {directory_path}: {e}")
+        return False
+
+
+def find_parquet_files(search_paths):
+    """Find parquet files in multiple potential locations."""
+    parquet_files = []
+    
+    for search_path in search_paths:
+        try:
+            if search_path.exists() and search_path.is_dir():
+                files = [f for f in search_path.iterdir() 
+                        if f.is_file() and f.suffix.lower() == ".parquet"]
+                if files:
+                    print(f"Found {len(files)} parquet files in {search_path}")
+                    parquet_files.extend(files)
+                    break  # Use first location with files
+        except Exception as e:
+            print(f"Error accessing {search_path}: {e}")
+            continue
+    
+    return parquet_files
+
+
+@app.route("/debug/paths")
+def debug_paths():
+    """Debug endpoint to check path resolution across platforms."""
+    import platform
+    
+    debug_info = {
+        "platform": platform.system(),
+        "python_version": platform.python_version(),
+        "current_working_directory": str(Path.cwd()),
+        "project_root": str(PROJECT_ROOT),
+        "processed_folder": str(PROCESSED_FOLDER),
+        "pipeline_output_folder": str(PIPELINE_OUTPUT_FOLDER),
+        "environment_variables": {
+            "PROCESSED_FOLDER": os.getenv("PROCESSED_FOLDER", "Not set"),
+            "PIPELINE_OUTPUT_FOLDER": os.getenv("PIPELINE_OUTPUT_FOLDER", "Not set"),
+            "UPLOAD_FOLDER": os.getenv("UPLOAD_FOLDER", "Not set"),
+        },
+        "path_checks": {}
+    }
+    
+    # Check various paths
+    paths_to_check = {
+        "processed_folder": PROCESSED_FOLDER,
+        "pipeline_output_folder": PIPELINE_OUTPUT_FOLDER,
+        "project_root": PROJECT_ROOT,
+        "docker_data": Path("/app/data"),
+        "docker_processed": Path("/app/data/processed"),
+        "docker_pipeline": Path("/app/data/pipeline_output"),
+        "relative_data": Path("./data"),
+        "relative_processed": Path("./data/processed"),
+    }
+    
+    for name, path in paths_to_check.items():
+        try:
+            info = {
+                "path": str(path),
+                "exists": path.exists() if path else False,
+                "is_dir": path.is_dir() if path and path.exists() else False,
+                "is_absolute": path.is_absolute() if path else False,
+            }
+            
+            if info["exists"] and info["is_dir"]:
+                try:
+                    files = list(path.iterdir())
+                    info["file_count"] = len(files)
+                    info["parquet_count"] = len([f for f in files if f.suffix.lower() == ".parquet"])
+                    info["files"] = [f.name for f in files[:10]]  # First 10 files
+                except Exception as e:
+                    info["read_error"] = str(e)
+            
+            debug_info["path_checks"][name] = info
+        except Exception as e:
+            debug_info["path_checks"][name] = {"error": str(e)}
+    
+    return jsonify(debug_info)
 
 
 @app.route("/")
-def index():
+def home():
+    """Home page with upload interface."""
+    return render_template("index.html", fastapi_url=FASTAPI_BROWSER_URL)
     """Main dashboard page with stepper interface."""
     return render_template(
         "index.html", fastapi_url=FASTAPI_BROWSER_URL, page_title="ETL Dashboard"
@@ -249,19 +347,50 @@ def download_powerbi_package(file_id):
         # Get Parquet files from processed folder
         parquet_files = []
 
-        if PROCESSED_FOLDER.exists():
-            print(f"Checking processed folder: {PROCESSED_FOLDER}")
-            for file_path in PROCESSED_FOLDER.iterdir():
-                if file_path.is_file() and file_path.suffix.lower() == ".parquet":
-                    parquet_files.append(file_path)
-                    print(f"Found parquet file: {file_path.name}")
+        # Get Parquet files from multiple potential locations
+        search_paths = [
+            PROCESSED_FOLDER,
+            PIPELINE_OUTPUT_FOLDER,
+            Path("/app/data/processed"),  # Docker absolute path
+            Path("/app/data/pipeline_output"),  # Docker absolute path  
+            PROJECT_ROOT / "data" / "processed",  # Local relative path
+            PROJECT_ROOT / "data" / "pipeline_output"  # Local relative path
+        ]
+        
+        # Ensure processed folder exists
+        ensure_directory_exists(PROCESSED_FOLDER)
+        
+        print(f"Searching for parquet files in {len(search_paths)} locations:")
+        for path in search_paths:
+            print(f"  - {path} (exists: {path.exists() if path else False})")
+        
+        parquet_files = find_parquet_files(search_paths)
 
         if not parquet_files:
-            print(f"No parquet files found in {PROCESSED_FOLDER}")
-            return (
-                jsonify({"error": "No Parquet files found for Power BI package"}),
-                404,
-            )
+            # Last attempt: try listing all accessible directories
+            print("No parquet files found in standard locations. Checking current working directory...")
+            cwd = Path.cwd()
+            print(f"Current working directory: {cwd}")
+            
+            potential_data_dirs = [
+                cwd / "data" / "processed",
+                cwd / "data" / "pipeline_output",
+                Path("/app") / "data" / "processed",
+                Path("/app") / "data" / "pipeline_output"
+            ]
+            
+            for potential_dir in potential_data_dirs:
+                if potential_dir.exists():
+                    files = list(potential_dir.glob("*.parquet"))
+                    if files:
+                        print(f"Found {len(files)} parquet files in fallback location: {potential_dir}")
+                        parquet_files = files
+                        break
+                        
+            if not parquet_files:
+                error_msg = f"No Parquet files found for Power BI package. Searched in: {[str(p) for p in search_paths]}"
+                print(error_msg)
+                return jsonify({"error": error_msg}), 404
 
         print(f"Found {len(parquet_files)} parquet files")
 
