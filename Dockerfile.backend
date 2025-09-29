@@ -16,14 +16,18 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY backend/ ./backend/
+COPY powerbi/ ./powerbi/
 
-# Copy environment configuration and initialization script
+# Create and set permissions for data directories
+RUN mkdir -p /app/data/uploads \
+             /app/data/processed \
+             /app/data/pipeline_output && \
+    chmod -R 777 /app/data && \
+    touch /app/data/processed/.keep \
+         /app/data/pipeline_output/.keep
+
+# Copy environment configuration
 COPY .env.production .env
-COPY docker-init.sh /app/docker-init.sh
-RUN chmod +x /app/docker-init.sh
-
-# Initialize directories with proper cross-platform setup
-RUN /app/docker-init.sh
 
 # Expose port
 EXPOSE 8000
@@ -33,4 +37,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the application
-CMD ["sh", "-c", "/app/docker-init.sh && uvicorn backend.main:app --host 0.0.0.0 --port 8000"]
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
