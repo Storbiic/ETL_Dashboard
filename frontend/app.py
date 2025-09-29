@@ -134,9 +134,7 @@ def debug_paths():
 
 
 @app.route("/")
-def home():
-    """Home page with upload interface."""
-    return render_template("index.html", fastapi_url=FASTAPI_BROWSER_URL)
+def index():
     """Main dashboard page with stepper interface."""
     return render_template(
         "index.html", fastapi_url=FASTAPI_BROWSER_URL, page_title="ETL Dashboard"
