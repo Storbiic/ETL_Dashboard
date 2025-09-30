@@ -747,7 +747,7 @@ def test_page():
 if __name__ == "__main__":
     # Development server
     host = os.getenv("FLASK_HOST", "127.0.0.1")
-    port = int(os.getenv("FLASK_PORT", "5000"))
+    port = int(os.getenv("FLASK_PORT", "8080"))
     debug = os.getenv("FLASK_DEBUG", "true").lower() == "true"
 
     app.run(host=host, port=port, debug=debug)
