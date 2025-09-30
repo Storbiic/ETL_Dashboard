@@ -16,12 +16,20 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
 
 # Configuration for different deployment environments
 class Config:
-    # For Docker, internal communication uses service name
-    FASTAPI_BASE_URL = f"http://{os.getenv('FASTAPI_HOST', '127.0.0.1')}:{os.getenv('FASTAPI_PORT', '8000')}"
-    # For browser, always use localhost (Docker port mapping)
-    FASTAPI_BROWSER_URL = f"http://localhost:{os.getenv('FASTAPI_PORT', '8000')}"
+    # Check if we're in GCP Cloud Run (FASTAPI_HOST will be the full backend URL)
+    fastapi_host = os.getenv('FASTAPI_HOST', '127.0.0.1')
+    fastapi_port = os.getenv('FASTAPI_PORT', '8000')
+    
+    # If FASTAPI_HOST is a full URL (starts with http), use it directly
+    if fastapi_host.startswith('http'):
+        FASTAPI_BASE_URL = fastapi_host
+        FASTAPI_BROWSER_URL = fastapi_host
+    else:
+        # For Docker/local, construct URLs
+        FASTAPI_BASE_URL = f"http://{fastapi_host}:{fastapi_port}"
+        FASTAPI_BROWSER_URL = f"http://localhost:{fastapi_port}"
 
-    PORT = int(os.getenv("PORT", 5000))
+    PORT = int(os.getenv("PORT", 8080))  # Changed default from 5000 to 8080 for GCP Cloud Run
     DEBUG = os.getenv("FLASK_DEBUG", "false").lower() == "true"
 
 
@@ -137,7 +145,7 @@ def debug_paths():
 def index():
     """Main dashboard page with stepper interface."""
     return render_template(
-        "index.html", fastapi_url=FASTAPI_BROWSER_URL, page_title="ETL Dashboard"
+        "index.html", fastapi_url=FASTAPI_BASE_URL, page_title="ETL Dashboard"
     )
 
 
@@ -154,7 +162,7 @@ def preview():
         "preview.html",
         file_id=file_id,
         sheet=sheet,
-        fastapi_url=FASTAPI_BROWSER_URL,
+        fastapi_url=FASTAPI_BASE_URL,
         page_title="Sheet Preview",
     )
 
@@ -174,7 +182,7 @@ def profile():
         file_id=file_id,
         master_sheet=master_sheet,
         status_sheet=status_sheet,
-        fastapi_url=FASTAPI_BROWSER_URL,
+        fastapi_url=FASTAPI_BASE_URL,
         page_title="Data Profile",
     )
 
@@ -190,7 +198,7 @@ def results():
     return render_template(
         "results.html",
         file_id=file_id,
-        fastapi_url=FASTAPI_BROWSER_URL,
+        fastapi_url=FASTAPI_BASE_URL,
         page_title="ETL Results",
     )
 
@@ -199,7 +207,7 @@ def results():
 def logs():
     """Logs page for monitoring system activity."""
     return render_template(
-        "logs.html", fastapi_url=FASTAPI_BROWSER_URL, page_title="System Logs"
+        "logs.html", fastapi_url=FASTAPI_BASE_URL, page_title="System Logs"
     )
 
 
@@ -745,9 +753,9 @@ def test_page():
 
 
 if __name__ == "__main__":
-    # Development server
-    host = os.getenv("FLASK_HOST", "127.0.0.1")
-    port = int(os.getenv("FLASK_PORT", "8080"))
+    # Development server - Use PORT environment variable for consistency with Cloud Run
+    host = os.getenv("FLASK_HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", os.getenv("FLASK_PORT", "8080")))  # Priority: PORT -> FLASK_PORT -> 8080
     debug = os.getenv("FLASK_DEBUG", "true").lower() == "true"
 
     app.run(host=host, port=port, debug=debug)
