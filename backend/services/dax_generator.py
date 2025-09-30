@@ -10,8 +10,36 @@ class DAXGenerator:
 
     def __init__(self):
         """Initialize DAX generator."""
-        self.project_root = Path(__file__).parent.parent.parent
+        # Try multiple path resolution strategies for different environments
+        self.project_root = self._find_project_root()
         self.measures_file = self.project_root / "powerbi" / "measures_dax.md"
+
+    def _find_project_root(self) -> Path:
+        """Find the project root directory in different environments."""
+        # Strategy 1: Check if we're in Docker (/app)
+        docker_root = Path("/app")
+        if docker_root.exists() and (docker_root / "powerbi").exists():
+            return docker_root
+        
+        # Strategy 2: Use PYTHONPATH environment variable
+        pythonpath = os.getenv("PYTHONPATH")
+        if pythonpath and Path(pythonpath).exists():
+            pythonpath_root = Path(pythonpath)
+            if (pythonpath_root / "powerbi").exists():
+                return pythonpath_root
+        
+        # Strategy 3: Traditional relative path (for local development)
+        file_root = Path(__file__).parent.parent.parent
+        if (file_root / "powerbi").exists():
+            return file_root
+        
+        # Strategy 4: Current working directory
+        cwd_root = Path.cwd()
+        if (cwd_root / "powerbi").exists():
+            return cwd_root
+        
+        # Fallback to file-based resolution
+        return Path(__file__).parent.parent.parent
 
     def generate_dax_file(self, output_path: str) -> str:
         """
@@ -24,7 +52,14 @@ class DAXGenerator:
             Path to the generated .dax file
         """
         if not self.measures_file.exists():
-            raise FileNotFoundError(f"Measures file not found: {self.measures_file}")
+            # Enhanced error message with debugging info
+            error_msg = f"Measures file not found: {self.measures_file}\n"
+            error_msg += f"Project root: {self.project_root}\n"
+            error_msg += f"PowerBI directory exists: {(self.project_root / 'powerbi').exists()}\n"
+            error_msg += f"PowerBI directory contents: {list((self.project_root / 'powerbi').glob('*')) if (self.project_root / 'powerbi').exists() else 'N/A'}\n"
+            error_msg += f"Current working directory: {Path.cwd()}\n"
+            error_msg += f"File location: {Path(__file__).parent}\n"
+            raise FileNotFoundError(error_msg)
 
         # Read the markdown file
         with open(self.measures_file, "r", encoding="utf-8") as f:
