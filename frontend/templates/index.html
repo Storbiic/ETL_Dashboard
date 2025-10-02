@@ -196,7 +196,13 @@
             Step 2: Select Sheets
         </h2>
 
-        <p class="text-gray-600 mb-6">Choose exactly two sheets: one for MasterBOM and one for Status data. Auto-detected sheets are pre-selected when possible.</p>
+        <p class="text-gray-600 mb-6">Choose exactly two sheets: one for MasterBOM and one for Status data. 
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 ml-1">
+                <i class="fas fa-filter mr-1"></i>Smart Filtering Active
+            </span>
+        </p>
+
+        
 
         <!-- Auto-detection results will be inserted here -->
 
@@ -210,15 +216,15 @@
                     <select id="master-sheet"
                             class="w-full border border-gray-300 rounded-md px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                             onchange="checkSheetSelection()">
-                        <option value="">Select sheet...</option>
+                        <option value=""></option>
                     </select>
                     <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                         <i class="fas fa-chevron-down text-gray-400"></i>
                     </div>
                 </div>
                 <div class="text-xs text-gray-500">
-                    <i class="fas fa-info-circle mr-1"></i>
-                    Contains parts, components, or bill of materials data
+                    <i class="fas fa-filter mr-1"></i>
+                    Only BOM-related sheets (contains: parts, components, materials, etc.)
                 </div>
             </div>
 
@@ -231,15 +237,37 @@
                     <select id="status-sheet"
                             class="w-full border border-gray-300 rounded-md px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                             onchange="checkSheetSelection()">
-                        <option value="">Select sheet...</option>
+                        <option value="">Select Status sheet...</option>
                     </select>
                     <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                         <i class="fas fa-chevron-down text-gray-400"></i>
                     </div>
                 </div>
                 <div class="text-xs text-gray-500">
-                    <i class="fas fa-info-circle mr-1"></i>
-                    Contains status, summary, or dashboard data
+                    <i class="fas fa-filter mr-1"></i>
+                    Only Status-related sheets (contains: project, tracking, summary, etc.)
+                </div>
+            </div>
+        </div>
+
+        <!-- Manual Override Button -->
+        <div class="mt-4 text-center">
+            <button id="show-all-sheets-btn" 
+                    class="hidden inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200"
+                    onclick="toggleShowAllSheets()">
+                <i class="fas fa-eye mr-2"></i>
+                Show All Sheets
+            </button>
+            <p class="text-xs text-gray-500 mt-1">Click if your sheet doesn't appear in the filtered lists</p>
+        </div>
+
+        <!-- Smart Filtering Info -->
+        <div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div class="flex items-start">
+                <i class="fas fa-lightbulb text-blue-600 mr-2 mt-0.5"></i>
+                <div class="text-sm text-blue-800">
+                    <strong>Smart Filtering:</strong> Each dropdown only shows sheets that are likely to contain the relevant data type. 
+                    Sheets marked with ✨ are auto-detected with high confidence.
                 </div>
             </div>
         </div>

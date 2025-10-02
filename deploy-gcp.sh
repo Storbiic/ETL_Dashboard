@@ -19,15 +19,27 @@ echo "🚀 Deploying ETL Dashboard to GCP Cloud Run (Europe West 3)..."
 # Ensure authentication and project setup
 echo "🔐 Setting up authentication..."
 gcloud config set project ${PROJECT_ID}
-gcloud auth configure-docker ${REGISTRY_URL}
+
+
+# Configure Docker authentication for Artifact Registry
+echo "🐋 Configuring Docker authentication..."
+gcloud auth configure-docker ${REGISTRY_URL} --quiet
+
+# Verify authentication works by testing project access
+echo "🔐 Testing project access..."
+if ! gcloud config get-value project &>/dev/null; then
+    echo "❌ Project access failed!"
+    echo "💡 Make sure you have access to project: ${PROJECT_ID}"
+    exit 1
+fi
 
 # Create Artifact Registry repository if it doesn't exist
 echo "📦 Creating Artifact Registry repository..."
-gcloud artifacts repositories create ${REPOSITORY} \
-    --repository-format=docker \
-    --location=${REGION} \
-    --description="ETL Dashboard container images" \
-    --project=${PROJECT_ID} || echo "Repository already exists"
+gcloud artifacts repositories create ${REPOSITORY} 
+    --repository-format=docker 
+    --location=${REGION} 
+    --description="ETL Dashboard container images" 
+    --project=${PROJECT_ID} 2>/dev/null || echo "ℹ️  Repository already exists"
 
 echo ""
 echo "==================== BACKEND DEPLOYMENT ===================="
@@ -50,17 +62,16 @@ fi
 
 # Deploy Backend
 echo "🌐 Deploying backend service..."
-gcloud run deploy ${BACKEND_SERVICE} \
-    --image ${BACKEND_IMAGE} \
-    --platform managed \
-    --region ${REGION} \
-    --allow-unauthenticated \
-    --port 8000 \
-    --timeout 900 \
-    --memory 2Gi \
-    --cpu 2 \
-    --max-instances 10 \
-    --set-env-vars "FASTAPI_HOST=0.0.0.0,FASTAPI_PORT=8000,LOG_LEVEL=INFO,PYTHONPATH=/app" \
+gcloud run deploy ${BACKEND_SERVICE} 
+    --image ${BACKEND_IMAGE} 
+    --platform managed 
+    --region ${REGION} 
+    --allow-unauthenticated 
+    --port 8000 
+    --timeout 900 
+    --memory 2Gi 
+    --cpu 1 
+    --max-instances 1 
     --project ${PROJECT_ID}
 
 if [ $? -ne 0 ]; then
@@ -94,17 +105,17 @@ fi
 
 # Deploy Frontend with Backend URL
 echo "🌐 Deploying frontend service..."
-gcloud run deploy ${FRONTEND_SERVICE} \
-    --image ${FRONTEND_IMAGE} \
-    --platform managed \
-    --region ${REGION} \
-    --allow-unauthenticated \
-    --port 8080 \
-    --timeout 900 \
-    --memory 2Gi \
-    --cpu 2 \
-    --max-instances 10 \
-    --set-env-vars "PORT=8080,FLASK_ENV=production,PYTHONPATH=/app,FASTAPI_HOST=${BACKEND_URL},FASTAPI_PORT=443" \
+gcloud run deploy ${FRONTEND_SERVICE} 
+    --image ${FRONTEND_IMAGE} 
+    --platform managed 
+    --region ${REGION} 
+    --allow-unauthenticated 
+    --port 8080 
+    --timeout 900 
+    --memory 2Gi 
+    --cpu 1 
+    --max-instances 1 
+    --set-env-vars "FLASK_ENV=production,PYTHONPATH=/app,FASTAPI_HOST=${BACKEND_URL}" 
     --project ${PROJECT_ID}
 
 if [ $? -ne 0 ]; then

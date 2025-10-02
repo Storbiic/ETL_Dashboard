@@ -489,26 +489,55 @@ def download_csv_package(file_id):
 def download_dax_measures(file_id):
     """Download DAX measures file."""
     import tempfile
+    import os
+    import shutil
     from datetime import datetime
 
     from backend.services.dax_generator import DAXGenerator
 
     try:
-        # Generate DAX measures file
-        with tempfile.TemporaryDirectory() as temp_dir:
-            dax_generator = DAXGenerator()
-            dax_file_path = dax_generator.generate_dax_file(temp_dir)
+        # Create a temporary file that we can control
+        temp_fd, temp_path = tempfile.mkstemp(suffix='.dax', text=True)
+        
+        try:
+            # Generate DAX measures file in a temporary directory
+            with tempfile.TemporaryDirectory() as temp_dir:
+                dax_generator = DAXGenerator()
+                dax_file_path = dax_generator.generate_dax_file(temp_dir)
+                
+                # Close the temp file descriptor and copy the DAX content
+                os.close(temp_fd)
+                shutil.copy2(dax_file_path, temp_path)
 
             # Generate download filename with timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             download_filename = f"ETL_Dashboard_Measures_{timestamp}.dax"
 
+            def remove_file(response):
+                try:
+                    os.unlink(temp_path)
+                except OSError:
+                    pass
+                return response
+
             return send_file(
-                dax_file_path,
+                temp_path,
                 as_attachment=True,
                 download_name=download_filename,
                 mimetype="text/plain",
             )
+
+        except Exception as e:
+            # Clean up temp file on error
+            try:
+                os.close(temp_fd)
+            except:
+                pass
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
+            raise e
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500

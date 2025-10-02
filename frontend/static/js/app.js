@@ -692,12 +692,12 @@ function populateSheetSelectors(sheetNames, detectedSheets = null) {
     if (!masterSelect || !statusSelect) return;
 
     // Clear existing options
-    masterSelect.innerHTML = '<option value="">Select sheet...</option>';
-    statusSelect.innerHTML = '<option value="">Select sheet...</option>';
+    masterSelect.innerHTML = '<option value="">Select MasterBOM sheet...</option>';
+    statusSelect.innerHTML = '<option value="">Select Status sheet...</option>';
 
     // Log sheet detection results
     if (detectedSheets) {
-        addLogEntry('INFO', `Analyzing ${sheetNames.length} sheets for auto-detection...`);
+        addLogEntry('INFO', `Analyzing ${sheetNames.length} sheets for intelligent filtering...`);
 
         if (detectedSheets.masterbom) {
             const confidence = Math.round((detectedSheets.confidence?.masterbom || 0) * 100);
@@ -714,76 +714,233 @@ function populateSheetSelectors(sheetNames, detectedSheets = null) {
         }
     }
 
-    // Add sheet options with enhanced styling for detected sheets
-    sheetNames.forEach(sheet => {
-        const isMasterBomDetected = detectedSheets?.masterbom === sheet;
-        const isStatusDetected = detectedSheets?.status === sheet;
-
-        // Create options with special styling for detected sheets
-        const masterOption = new Option(sheet, sheet);
-        const statusOption = new Option(sheet, sheet);
-
-        // Add visual indicators for auto-detected sheets
-        if (isMasterBomDetected) {
-            const confidence = Math.round((detectedSheets.confidence?.masterbom || 0) * 100);
-            masterOption.text = `${sheet} ✨ (Auto-detected - ${confidence}%)`;
-            masterOption.style.fontWeight = 'bold';
-            masterOption.style.color = confidence >= 70 ? '#059669' : '#d97706';
-        }
-
-        if (isStatusDetected) {
-            const confidence = Math.round((detectedSheets.confidence?.status || 0) * 100);
-            statusOption.text = `${sheet} ✨ (Auto-detected - ${confidence}%)`;
-            statusOption.style.fontWeight = 'bold';
-            statusOption.style.color = confidence >= 70 ? '#059669' : '#d97706';
-        }
-
-        masterSelect.add(masterOption);
-        statusSelect.add(statusOption);
-    });
+    // Apply intelligent filtering
+    const filteredSheets = applyIntelligentSheetFiltering(sheetNames, detectedSheets);
+    
+    // Populate MasterBOM dropdown with ONLY BOM-related sheets
+    populateMasterBOMDropdown(masterSelect, filteredSheets.masterBomSheets, detectedSheets);
+    
+    // Populate Status dropdown with ONLY status-related sheets
+    populateStatusDropdown(statusSelect, filteredSheets.statusSheets, detectedSheets);
 
     // Handle auto-detection and auto-selection
     if (detectedSheets) {
         showAutoDetectionResults(detectedSheets);
-
-        // Auto-select detected sheets based on confidence thresholds
-        let autoSelectedCount = 0;
-
-        if (detectedSheets.masterbom && detectedSheets.confidence?.masterbom >= 0.5) {
-            masterSelect.value = detectedSheets.masterbom;
-            autoSelectedCount++;
-            addLogEntry('INFO', `Auto-selected MasterBOM sheet: "${detectedSheets.masterbom}"`);
-        }
-
-        if (detectedSheets.status && detectedSheets.confidence?.status >= 0.5) {
-            statusSelect.value = detectedSheets.status;
-            autoSelectedCount++;
-            addLogEntry('INFO', `Auto-selected Status sheet: "${detectedSheets.status}"`);
-        }
-
-        // Update progress based on auto-selection success
-        if (autoSelectedCount === 2) {
-            updateStepProgress(2, 80, 'current');
-            addLogEntry('SUCCESS', 'Both sheets auto-selected successfully! Review and proceed or modify if needed.');
-            showToast('Sheets auto-detected and selected!', 'success');
-        } else if (autoSelectedCount === 1) {
-            updateStepProgress(2, 40, 'current');
-            addLogEntry('INFO', 'One sheet auto-selected. Please select the remaining sheet manually.');
-            showToast('One sheet auto-detected. Please select the other manually.', 'info');
-        } else {
-            updateStepProgress(2, 20, 'current');
-            addLogEntry('INFO', 'No sheets auto-selected. Please make manual selections.');
-            showToast('Please select sheets manually.', 'info');
-        }
-
-        // Check if both sheets are selected (auto or manual)
-        checkSheetSelection();
+        autoSelectDetectedSheets(masterSelect, statusSelect, detectedSheets);
     }
 
     // Show sheet selection section with animation
     const sheetSection = document.getElementById('sheet-selection');
     sheetSection.classList.remove('hidden');
     sheetSection.classList.add('fade-in');
+}
+
+/**
+ * Apply intelligent sheet filtering based on sheet names and backend detection
+ */
+function applyIntelligentSheetFiltering(sheetNames, detectedSheets) {
+    // Get backend suggestions if available
+    const masterBomCandidates = detectedSheets?.suggestions?.masterbom_candidates || [];
+    const statusCandidates = detectedSheets?.suggestions?.status_candidates || [];
+    
+    // Create sets for backend-detected sheets
+    const backendMasterBomSheets = new Set(masterBomCandidates.map(([sheet, score]) => sheet));
+    const backendStatusSheets = new Set(statusCandidates.map(([sheet, score]) => sheet));
+    
+    // Frontend keyword-based detection patterns
+    const bomKeywords = [
+        'masterbom', 'master_bom', 'master-bom',
+        'bom', 'bill', 'parts', 'components', 'materials',
+        'inventory', 'item', 'product', 'assembly'
+    ];
+    
+    const statusKeywords = [
+        'status', 'project', 'summary', 'management', 'tracking',
+        'progress', 'timeline', 'schedule', 'plan', 'overview',
+        'dashboard', 'report', 'metrics', 'kpi'
+    ];
+    
+    // Apply frontend keyword filtering
+    const frontendMasterBomSheets = sheetNames.filter(sheet => 
+        bomKeywords.some(keyword => 
+            sheet.toLowerCase().includes(keyword.toLowerCase())
+        )
+    );
+    
+    const frontendStatusSheets = sheetNames.filter(sheet => 
+        statusKeywords.some(keyword => 
+            sheet.toLowerCase().includes(keyword.toLowerCase())
+        )
+    );
+    
+    // Combine backend and frontend detection (union)
+    const masterBomSheets = [...new Set([
+        ...Array.from(backendMasterBomSheets),
+        ...frontendMasterBomSheets
+    ])];
+    
+    const statusSheets = [...new Set([
+        ...Array.from(backendStatusSheets),
+        ...frontendStatusSheets
+    ])];
+    
+    // If no sheets detected for a category, use all sheets as fallback
+    const finalMasterBomSheets = masterBomSheets.length > 0 ? masterBomSheets : sheetNames;
+    const finalStatusSheets = statusSheets.length > 0 ? statusSheets : sheetNames;
+    
+    return {
+        masterBomSheets: finalMasterBomSheets,
+        statusSheets: finalStatusSheets,
+        usedFallback: {
+            masterBom: masterBomSheets.length === 0,
+            status: statusSheets.length === 0
+        },
+        detectionStats: {
+            backendMasterBom: backendMasterBomSheets.size,
+            frontendMasterBom: frontendMasterBomSheets.length,
+            backendStatus: backendStatusSheets.size,
+            frontendStatus: frontendStatusSheets.length
+        }
+    };
+}
+
+/**
+ * Populate MasterBOM dropdown with intelligent filtering
+ */
+function populateMasterBOMDropdown(masterSelect, sheets, detectedSheets) {
+    const masterBomCandidates = detectedSheets?.suggestions?.masterbom_candidates || [];
+    const usedFallback = sheets.length === masterBomCandidates.length && masterBomCandidates.length === 0;
+    
+    // Add fallback warning if needed
+    if (usedFallback) {
+        const warningOption = new Option('⚠️ No BOM sheets detected. Showing all sheets.', '');
+        warningOption.disabled = true;
+        warningOption.style.color = '#ef4444';
+        warningOption.style.fontStyle = 'italic';
+        masterSelect.add(warningOption);
+        
+        addLogEntry('WARNING', 'No BOM sheets detected. Showing all sheets as fallback.');
+    } else {
+        // Add info header for filtered results
+        const infoOption = new Option('');
+        infoOption.disabled = true;
+        infoOption.style.color = '#059669';
+        infoOption.style.fontStyle = 'italic';
+        masterSelect.add(infoOption);
+        
+        addLogEntry('INFO', `Filtered to ${sheets.length} BOM-related sheets.`);
+    }
+    
+    // Populate with filtered sheets
+    sheets.forEach(sheet => {
+        const candidate = masterBomCandidates.find(([s]) => s === sheet);
+        const option = new Option(sheet, sheet);
+        
+        if (candidate) {
+            const [, score] = candidate;
+            const confidence = Math.round(score * 100);
+            const isDetected = detectedSheets?.masterbom === sheet;
+            
+            if (isDetected) {
+                option.text = `${sheet} ✨ (Auto-detected - ${confidence}%)`;
+                option.style.fontWeight = 'bold';
+                option.style.color = confidence >= 70 ? '#059669' : '#d97706';
+            } else if (confidence >= 40) {
+                option.text = `${sheet} (${confidence}% match)`;
+                option.style.color = '#6b7280';
+            }
+        }
+        
+        masterSelect.add(option);
+    });
+}
+
+/**
+ * Populate Status dropdown with intelligent filtering
+ */
+function populateStatusDropdown(statusSelect, sheets, detectedSheets) {
+    const statusCandidates = detectedSheets?.suggestions?.status_candidates || [];
+    const usedFallback = sheets.length === statusCandidates.length && statusCandidates.length === 0;
+    
+    // Add fallback warning if needed
+    if (usedFallback) {
+        const warningOption = new Option('⚠️ No Status sheets detected. Showing all sheets.', '');
+        warningOption.disabled = true;
+        warningOption.style.color = '#ef4444';
+        warningOption.style.fontStyle = 'italic';
+        statusSelect.add(warningOption);
+        
+        addLogEntry('WARNING', 'No Status sheets detected. Showing all sheets as fallback.');
+    } else {
+        // Add info header for filtered results
+        const infoOption = new Option('');
+        infoOption.disabled = true;
+        infoOption.style.color = '#059669';
+        infoOption.style.fontStyle = 'italic';
+        statusSelect.add(infoOption);
+        
+        addLogEntry('INFO', `Filtered to ${sheets.length} Status-related sheets.`);
+    }
+    
+    // Populate with filtered sheets
+    sheets.forEach(sheet => {
+        const candidate = statusCandidates.find(([s]) => s === sheet);
+        const option = new Option(sheet, sheet);
+        
+        if (candidate) {
+            const [, score] = candidate;
+            const confidence = Math.round(score * 100);
+            const isDetected = detectedSheets?.status === sheet;
+            
+            if (isDetected) {
+                option.text = `${sheet} ✨ (Auto-detected - ${confidence}%)`;
+                option.style.fontWeight = 'bold';
+                option.style.color = confidence >= 70 ? '#059669' : '#d97706';
+            } else if (confidence >= 40) {
+                option.text = `${sheet} (${confidence}% match)`;
+                option.style.color = '#6b7280';
+            }
+        }
+        
+        statusSelect.add(option);
+    });
+}
+
+/**
+ * Handle auto-selection of detected sheets
+ */
+function autoSelectDetectedSheets(masterSelect, statusSelect, detectedSheets) {
+    let autoSelectedCount = 0;
+
+    if (detectedSheets.masterbom && detectedSheets.confidence?.masterbom >= 0.5) {
+        masterSelect.value = detectedSheets.masterbom;
+        autoSelectedCount++;
+        addLogEntry('INFO', `Auto-selected MasterBOM sheet: "${detectedSheets.masterbom}"`);
+    }
+
+    if (detectedSheets.status && detectedSheets.confidence?.status >= 0.5) {
+        statusSelect.value = detectedSheets.status;
+        autoSelectedCount++;
+        addLogEntry('INFO', `Auto-selected Status sheet: "${detectedSheets.status}"`);
+    }
+
+    // Update progress based on auto-selection success
+    if (autoSelectedCount === 2) {
+        updateStepProgress(2, 80, 'current');
+        addLogEntry('SUCCESS', 'Both sheets auto-selected successfully! Review and proceed or modify if needed.');
+        showToast('Sheets auto-detected and selected!', 'success');
+    } else if (autoSelectedCount === 1) {
+        updateStepProgress(2, 40, 'current');
+        addLogEntry('INFO', 'One sheet auto-selected. Please select the remaining sheet manually.');
+        showToast('One sheet auto-detected. Please select the other manually.', 'info');
+    } else {
+        updateStepProgress(2, 20, 'current');
+        addLogEntry('INFO', 'No sheets auto-selected. Please make manual selections.');
+        showToast('Please select sheets manually.', 'info');
+    }
+
+    // Check if both sheets are selected (auto or manual)
+    checkSheetSelection();
 }
 
 function showAutoDetectionResults(detectedSheets) {
@@ -1685,6 +1842,119 @@ function getCurrentFileId() {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('file_id') || window.currentFileId;
 }
+
+/**
+ * Toggle showing all sheets in dropdowns (manual override for smart filtering)
+ */
+function toggleShowAllSheets() {
+    const btn = document.getElementById('show-all-sheets-btn');
+    const isShowingAll = btn.textContent.includes('Hide');
+    
+    if (isShowingAll) {
+        // Return to smart filtering
+        if (window.lastDetectedSheets && uploadedSheets) {
+            populateSheetSelectors(uploadedSheets, window.lastDetectedSheets);
+            btn.innerHTML = '<i class="fas fa-eye mr-2"></i>Show All Sheets';
+            addLogEntry('INFO', 'Returned to smart filtering mode.');
+            showToast('Smart filtering restored', 'info');
+        }
+    } else {
+        // Show all sheets
+        if (uploadedSheets) {
+            populateAllSheets(uploadedSheets, window.lastDetectedSheets);
+            btn.innerHTML = '<i class="fas fa-eye-slash mr-2"></i>Hide Filtered View';
+            addLogEntry('WARNING', 'Manual override: Showing all sheets in both dropdowns.');
+            showToast('Showing all sheets (filtering disabled)', 'warning');
+        }
+    }
+}
+
+/**
+ * Populate dropdowns with all sheets (override smart filtering)
+ */
+function populateAllSheets(sheetNames, detectedSheets) {
+    const masterSelect = document.getElementById('master-sheet');
+    const statusSelect = document.getElementById('status-sheet');
+
+    if (!masterSelect || !statusSelect) return;
+
+    // Clear and repopulate with all sheets
+    masterSelect.innerHTML = '<option value=""></option>';
+    statusSelect.innerHTML = '<option value=""></option>';
+
+    // Add warning headers
+    const masterWarning = new Option('⚠️ Manual Override: Showing ALL sheets', '');
+    masterWarning.disabled = true;
+    masterWarning.style.color = '#dc2626';
+    masterWarning.style.fontStyle = 'italic';
+    masterSelect.add(masterWarning);
+
+    const statusWarning = new Option('⚠️ Manual Override: Showing ALL sheets', '');
+    statusWarning.disabled = true;
+    statusWarning.style.color = '#dc2626';
+    statusWarning.style.fontStyle = 'italic';
+    statusSelect.add(statusWarning);
+
+    // Get detection data for styling
+    const masterBomCandidates = detectedSheets?.suggestions?.masterbom_candidates || [];
+    const statusCandidates = detectedSheets?.suggestions?.status_candidates || [];
+
+    // Add all sheets to both dropdowns
+    sheetNames.forEach(sheet => {
+        // Master dropdown
+        const masterOption = new Option(sheet, sheet);
+        const masterCandidate = masterBomCandidates.find(([s]) => s === sheet);
+        
+        if (masterCandidate) {
+            const [, score] = masterCandidate;
+            const confidence = Math.round(score * 100);
+            const isDetected = detectedSheets?.masterbom === sheet;
+            
+            if (isDetected) {
+                masterOption.text = `${sheet} ✨ (Auto-detected - ${confidence}%)`;
+                masterOption.style.fontWeight = 'bold';
+                masterOption.style.color = '#059669';
+            } else {
+                masterOption.text = `${sheet} (${confidence}% BOM match)`;
+                masterOption.style.color = '#6b7280';
+            }
+        }
+        
+        masterSelect.add(masterOption);
+
+        // Status dropdown
+        const statusOption = new Option(sheet, sheet);
+        const statusCandidate = statusCandidates.find(([s]) => s === sheet);
+        
+        if (statusCandidate) {
+            const [, score] = statusCandidate;
+            const confidence = Math.round(score * 100);
+            const isDetected = detectedSheets?.status === sheet;
+            
+            if (isDetected) {
+                statusOption.text = `${sheet} ✨ (Auto-detected - ${confidence}%)`;
+                statusOption.style.fontWeight = 'bold';
+                statusOption.style.color = '#059669';
+            } else {
+                statusOption.text = `${sheet} (${confidence}% Status match)`;
+                statusOption.style.color = '#6b7280';
+            }
+        }
+        
+        statusSelect.add(statusOption);
+    });
+
+    // Auto-select if previously detected
+    if (detectedSheets?.masterbom) {
+        masterSelect.value = detectedSheets.masterbom;
+    }
+    if (detectedSheets?.status) {
+        statusSelect.value = detectedSheets.status;
+    }
+}
+
+// Export functions for global access
+window.toggleShowAllSheets = toggleShowAllSheets;
 
 // Export functions for use in templates
 window.ETLDashboard = {
