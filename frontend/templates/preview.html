@@ -71,10 +71,12 @@
     </div>
 </div>
 
+
 <script>
 const fileId = '{{ file_id }}';
 const sheetName = '{{ sheet }}';
-const FASTAPI_URL = '{{ fastapi_url }}';
+// Use the global FASTAPI_URL from base template (set in window.FASTAPI_URL)
+const FASTAPI_URL = window.FASTAPI_URL || 'http://127.0.0.1:8000';
 
 document.addEventListener('DOMContentLoaded', function() {
     loadSheetPreview();

@@ -7,6 +7,18 @@
     
     <!-- Tailwind CSS (Local) -->
     <script src="{{ url_for('static', filename='vendor/js/tailwind.js') }}"></script>
+    <script>
+        // Suppress Tailwind CDN warning since we're using a local copy
+        if (typeof tailwind !== 'undefined') {
+            const originalWarn = console.warn;
+            console.warn = function(message) {
+                if (typeof message === 'string' && message.includes('cdn.tailwindcss.com should not be used in production')) {
+                    return; // Suppress this specific warning
+                }
+                originalWarn.apply(console, arguments);
+            };
+        }
+    </script>
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">

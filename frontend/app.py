@@ -27,6 +27,7 @@ class Config:
     else:
         # For Docker/local, construct URLs
         FASTAPI_BASE_URL = f"http://{fastapi_host}:{fastapi_port}"
+        # Always use localhost for browser requests (not docker service names)
         FASTAPI_BROWSER_URL = f"http://localhost:{fastapi_port}"
 
     PORT = int(os.getenv("PORT", 8080))  # Changed default from 5000 to 8080 for GCP Cloud Run
@@ -145,7 +146,7 @@ def debug_paths():
 def index():
     """Main dashboard page with stepper interface."""
     return render_template(
-        "index.html", fastapi_url=FASTAPI_BASE_URL, page_title="ETL Dashboard"
+        "index.html", fastapi_url=Config.FASTAPI_BROWSER_URL, page_title="ETL Dashboard"
     )
 
 
@@ -162,7 +163,7 @@ def preview():
         "preview.html",
         file_id=file_id,
         sheet=sheet,
-        fastapi_url=FASTAPI_BASE_URL,
+        fastapi_url=Config.FASTAPI_BROWSER_URL,
         page_title="Sheet Preview",
     )
 
@@ -182,7 +183,7 @@ def profile():
         file_id=file_id,
         master_sheet=master_sheet,
         status_sheet=status_sheet,
-        fastapi_url=FASTAPI_BASE_URL,
+        fastapi_url=Config.FASTAPI_BROWSER_URL,
         page_title="Data Profile",
     )
 
@@ -198,7 +199,7 @@ def results():
     return render_template(
         "results.html",
         file_id=file_id,
-        fastapi_url=FASTAPI_BASE_URL,
+        fastapi_url=Config.FASTAPI_BROWSER_URL,
         page_title="ETL Results",
     )
 
@@ -207,7 +208,7 @@ def results():
 def logs():
     """Logs page for monitoring system activity."""
     return render_template(
-        "logs.html", fastapi_url=FASTAPI_BASE_URL, page_title="System Logs"
+        "logs.html", fastapi_url=Config.FASTAPI_BROWSER_URL, page_title="System Logs"
     )
 
 
@@ -777,7 +778,7 @@ def api_transform():
 def test_page():
     """Test page for debugging frontend-backend communication."""
     return render_template(
-        "test.html", fastapi_url=FASTAPI_BASE_URL, page_title="Frontend-Backend Test"
+        "test.html", fastapi_url=Config.FASTAPI_BROWSER_URL, page_title="Frontend-Backend Test"
     )
 
 

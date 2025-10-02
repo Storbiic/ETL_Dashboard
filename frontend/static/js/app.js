@@ -9,7 +9,8 @@ let logPanelOpen = false;
 let startTime = null;
 
 // API base URL (will be set from template)
-let FASTAPI_URL = window.FASTAPI_URL || 'http://127.0.0.1:8000';
+// Use the FASTAPI_URL set by the template in window.FASTAPI_URL
+const FASTAPI_URL = window.FASTAPI_URL || 'http://127.0.0.1:8000';
 console.log('FASTAPI_URL set to:', FASTAPI_URL);
 
 // Step configuration
