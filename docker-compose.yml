@@ -29,10 +29,11 @@
       context: .
       dockerfile: Dockerfile.frontend
     ports:
-      - "3000:3000"
+      - "3000:8080"  # Map host port 3000 to container port 8080
     environment:
       - FLASK_HOST=0.0.0.0
-      - FLASK_PORT=3000
+      - FLASK_PORT=8080  # Updated to match Dockerfile
+      - PORT=8080        # Added PORT environment variable
       - FLASK_DEBUG=false
       - FASTAPI_HOST=backend
       - FASTAPI_PORT=8000
@@ -46,7 +47,7 @@
       - etl-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000/ || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]  # Updated to check port 8080
       interval: 30s
       timeout: 10s
       retries: 3

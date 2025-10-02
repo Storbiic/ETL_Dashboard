@@ -23,11 +23,32 @@ const STEPS = {
 // Initialize application
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM Content Loaded - Initializing application...');
-    initializeUpload();
-    initializeSheetSelection();
-    initializeLogPanel();
-    initializeProgressTracking();
-    console.log('Application initialized');
+    
+    // Only initialize upload functionality if upload area exists (main page)
+    const uploadArea = document.getElementById('upload-area');
+    if (uploadArea) {
+        initializeUpload();
+    }
+    
+    // Only initialize sheet selection if sheet selection exists (main page)
+    const sheetSelection = document.getElementById('sheet-selection');
+    if (sheetSelection) {
+        initializeSheetSelection();
+    }
+    
+    // Initialize log panel if it exists (available on all pages)
+    const logPanel = document.getElementById('log-panel');
+    if (logPanel) {
+        initializeLogPanel();
+    }
+    
+    // Initialize progress tracking if elements exist
+    const progressTracking = document.querySelector('.progress-tracker');
+    if (progressTracking) {
+        initializeProgressTracking();
+    }
+    
+    console.log('Application initialized for current page');
 });
 
 // Utility Functions
@@ -415,8 +436,8 @@ function initializeUpload() {
         removeFileBtn: !!removeFileBtn
     });
 
-    if (!uploadArea) {
-        console.error('Upload area not found!');
+    if (!uploadArea || !fileInput) {
+        console.log('Upload elements not found - skipping upload initialization');
         return;
     }
     
@@ -438,6 +459,8 @@ function initializeUpload() {
     if (removeFileBtn) {
         removeFileBtn.addEventListener('click', removeFile);
     }
+    
+    console.log('Upload functionality initialized successfully');
 }
 
 function handleFileSelect(event) {
@@ -1447,24 +1470,39 @@ function hideLoading() {
 async function runTransform() {
     console.log('🔧 Starting ETL Transform...');
 
-    if (!currentFileId) {
-        showToast('No file uploaded. Please upload a file first.', 'error');
+    // Get file ID and sheet names from URL parameters or stored values
+    const urlParams = new URLSearchParams(window.location.search);
+    const fileId = urlParams.get('file_id') || currentFileId;
+    const masterSheet = urlParams.get('master_sheet') || localStorage.getItem('selectedMasterSheet');
+    const statusSheet = urlParams.get('status_sheet') || localStorage.getItem('selectedStatusSheet');
+
+    console.log('Transform parameters from URL:', {
+        fileId,
+        masterSheet,
+        statusSheet,
+        currentURL: window.location.href
+    });
+
+    if (!fileId) {
+        showToast('No file ID found. Please upload a file first.', 'error');
+        console.error('Missing file ID - URL params:', Object.fromEntries(urlParams));
         return;
     }
-
-    // Get selected sheets
-    const masterSheet = document.getElementById('master-sheet-select')?.value;
-    const statusSheet = document.getElementById('status-sheet-select')?.value;
 
     if (!masterSheet || !statusSheet) {
-        showToast('Please select both master and status sheets.', 'error');
+        showToast('Missing sheet information. Please select sheets first.', 'error');
+        console.error('Missing sheets - master:', masterSheet, 'status:', statusSheet);
         return;
     }
 
-    console.log('Transform parameters:', {
-        fileId: currentFileId,
+    // Store in global variable for future use
+    currentFileId = fileId;
+
+    console.log('Transform parameters confirmed:', {
+        fileId,
         masterSheet,
-        statusSheet
+        statusSheet,
+        url: window.location.href
     });
 
     // Show progress modal
@@ -1472,7 +1510,7 @@ async function runTransform() {
 
     try {
         const transformRequest = {
-            file_id: currentFileId,
+            file_id: fileId,
             master_sheet: masterSheet,
             status_sheet: statusSheet,
             options: {
@@ -1509,14 +1547,14 @@ async function runTransform() {
             completeProgress();
 
             // Store result in sessionStorage for results page
-            sessionStorage.setItem(`transform_result_${currentFileId}`, JSON.stringify(result));
+            sessionStorage.setItem(`transform_result_${fileId}`, JSON.stringify(result));
 
             showToast('ETL transformation completed successfully!', 'success');
 
             // Redirect to results page after a short delay
             setTimeout(() => {
                 hideProgressModal();
-                window.location.href = `/results?file_id=${currentFileId}`;
+                window.location.href = `/results?file_id=${fileId}`;
             }, 2000);
         } else {
             throw new Error(result.error || 'Transform failed');
